@@ -10,8 +10,8 @@ import importlib.util
 
 import database
 import auth
-from pos_data_fetcher import POSDataFetcher
-from pos_response_generator import POSResponseGenerator
+from routers.pos_data_fetcher import POSDataFetcher
+from routers.pos_response_generator import POSResponseGenerator
 
 logger = logging.getLogger(__name__)
 
