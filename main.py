@@ -5,7 +5,7 @@ from starlette.requests import Request
 import os
 from dotenv import load_dotenv
 import database
-from .routers import users, items, invoices, ai_assistant, tables, alerts, table_carts, online_orders, raw_stock, parties
+from routers import users, items, invoices, ai_assistant, tables, alerts, table_carts, online_orders, raw_stock, parties
 
 # Load environment variables from .env file
 load_dotenv()

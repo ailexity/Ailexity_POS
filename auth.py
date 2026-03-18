@@ -8,7 +8,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pymongo.database import Database
 import database
 import schemas
-from .models import serialize_doc
+from models import serialize_doc
 
 # CONSTANTS - Load from environment variables for production security
 SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
