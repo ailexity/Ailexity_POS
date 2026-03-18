@@ -5,8 +5,8 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pymongo.database import Database
 
-from .. import auth, database, schemas
-from ..models import serialize_doc, serialize_docs
+from ailexity_backend import auth, database, schemas
+from ailexity_backend.models import serialize_doc, serialize_docs
 
 IST = timezone(timedelta(hours=5, minutes=30))
 

@@ -5,7 +5,7 @@ from bson import ObjectId
 from pydantic import BaseModel, Field
 from pymongo.database import Database
 
-from .. import database, auth
+from ailexity_backend import database, auth
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 

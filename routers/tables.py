@@ -3,10 +3,10 @@ from typing import List
 from bson import ObjectId
 from datetime import datetime
 
-from ..database import get_db
-from ..auth import get_current_active_user
-from ..schemas import TableCreate, TableUpdate, TableResponse
-from ..models import TableDocument, serialize_doc, serialize_docs, IST
+from ailexity_backend.database import get_db
+from ailexity_backend.auth import get_current_active_user
+from ailexity_backend.schemas import TableCreate, TableUpdate, TableResponse
+from ailexity_backend.models import TableDocument, serialize_doc, serialize_docs, IST
 
 router = APIRouter()
 

@@ -8,7 +8,7 @@ from datetime import datetime
 import logging
 import importlib.util
 
-from .. import database, auth
+from ailexity_backend import database, auth
 from .pos_data_fetcher import POSDataFetcher
 from .pos_response_generator import POSResponseGenerator
 

@@ -4,8 +4,8 @@ from datetime import datetime, timezone, timedelta
 from pymongo.database import Database
 from bson import ObjectId
 import os
-from .. import schemas, database, auth
-from ..models import InvoiceDocument, InvoiceItemDocument, serialize_doc
+from ailexity_backend import schemas, database, auth
+from ailexity_backend.models import InvoiceDocument, InvoiceItemDocument, serialize_doc
 
 # India Standard Time (IST) - GMT+5:30
 IST = timezone(timedelta(hours=5, minutes=30))

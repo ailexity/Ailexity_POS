@@ -7,8 +7,8 @@ from bson import ObjectId
 from html import escape
 import os
 import io
-from .. import schemas, database, auth
-from ..models import InvoiceDocument, InvoiceItemDocument, serialize_doc, serialize_docs
+from ailexity_backend import schemas, database, auth
+from ailexity_backend.models import InvoiceDocument, InvoiceItemDocument, serialize_doc, serialize_docs
 
 # India Standard Time (IST) - GMT+5:30
 IST = timezone(timedelta(hours=5, minutes=30))

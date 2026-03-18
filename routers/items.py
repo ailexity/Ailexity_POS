@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from pymongo.database import Database
 from bson import ObjectId
-from .. import schemas, database, auth
-from ..models import ItemDocument, serialize_doc, serialize_docs
+from ailexity_backend import schemas, database, auth
+from ailexity_backend.models import ItemDocument, serialize_doc, serialize_docs
 
 router = APIRouter(
     prefix="/items",
