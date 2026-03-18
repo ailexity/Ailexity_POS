@@ -6,7 +6,8 @@ import os
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pymongo.database import Database
-from ailexity_backend import database, schemas
+import database
+import schemas
 from .models import serialize_doc
 
 # CONSTANTS - Load from environment variables for production security

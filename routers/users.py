@@ -3,8 +3,10 @@ from typing import List, Optional
 from pymongo.database import Database
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
-from ailexity_backend import schemas, database, auth
-from ailexity_backend.models import UserDocument, serialize_doc, serialize_docs
+import schemas
+import database
+import auth
+from models import UserDocument, serialize_doc, serialize_docs
 
 # India Standard Time (IST) - GMT+5:30
 IST = timezone(timedelta(hours=5, minutes=30))

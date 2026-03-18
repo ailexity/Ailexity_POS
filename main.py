@@ -4,7 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 import os
 from dotenv import load_dotenv
-from ailexity_backend import database
+import database
 from .routers import users, items, invoices, ai_assistant, tables, alerts, table_carts, online_orders, raw_stock, parties
 
 # Load environment variables from .env file

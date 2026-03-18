@@ -59,7 +59,7 @@ class POSDataFetcher:
             Dictionary with POS data
         """
         try:
-            from ailexity_backend import database
+            import database
             
             invoice_filter = {} if self.admin_id is None else {"admin_id": self.admin_id}
 
