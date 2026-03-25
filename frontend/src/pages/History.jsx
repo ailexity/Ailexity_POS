@@ -1,21 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
-import { Eye, Smartphone, Search, FileText, Calendar, User, DollarSign, X, Filter } from 'lucide-react';
+import { Eye, Smartphone, Search, FileText, Calendar, User, DollarSign, X, Filter, FileDown } from 'lucide-react';
+import { downloadHistoryReport } from '../utils/reportGenerator';
+import { useAuth } from '../context/AuthContext';
+import './History.css';
 
 const History = () => {
+    const { user } = useAuth();
+    const businessType = String(user?.business_type || '').toLowerCase().includes('retail') ? 'retailer' : 'restaurant';
+    const pageTitle = businessType === 'retailer' ? 'Invoices' : 'History';
     const [invoices, setInvoices] = useState([]);
     const [search, setSearch] = useState("");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [selectedInvoice, setSelectedInvoice] = useState(null);
+    const [downloadingReport, setDownloadingReport] = useState(false);
 
     useEffect(() => {
         const fetchInvoices = async () => {
             try {
                 const res = await api.get('/invoices/');
-                setInvoices(res.data);
+                setInvoices(Array.isArray(res.data) ? res.data : []);
             } catch (e) {
                 console.error("Failed to fetch invoices", e);
+                setInvoices([]);
             }
         };
         fetchInvoices();
@@ -23,7 +31,8 @@ const History = () => {
 
     const shareWhatsApp = (invoice, e) => {
         e.stopPropagation();
-        const message = `*Invoice #${invoice.invoice_number}*\nDate: ${new Date(invoice.created_at).toLocaleDateString()}\nAmount: $${invoice.total_amount.toFixed(2)}\n\nThank you for your business!`;
+        const invoiceUrl = `${window.location.origin}/invoice/${invoice.id}`;
+        const message = `*Invoice #${invoice.invoice_number}*\nDate: ${new Date(invoice.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}\nAmount: ₹${invoice.total_amount.toFixed(2)}\n\nView Invoice: ${invoiceUrl}\n\nThank you for your business!`;
         const url = `https://wa.me/${invoice.customer_phone || ''}?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
     };
@@ -54,73 +63,107 @@ const History = () => {
         return matchesSearch && matchesDate;
     });
 
+    const handleDownloadReport = async () => {
+        if (filteredInvoices.length === 0) {
+            alert('No invoices to generate report');
+            return;
+        }
+        
+        setDownloadingReport(true);
+        try {
+            await downloadHistoryReport({
+                invoices: filteredInvoices,
+                startDate,
+                endDate,
+                userInfo: user
+            });
+        } catch (error) {
+            console.error('Failed to generate report:', error);
+            alert('Failed to generate report. Please try again.');
+        } finally {
+            setDownloadingReport(false);
+        }
+    };
+
     // Modal Component
     const InvoiceModal = ({ invoice, onClose }) => {
         if (!invoice) return null;
         return (
-            <div className="modal-overlay" onClick={onClose}>
-                <div className="modal-content" onClick={e => e.stopPropagation()}>
-                    <div className="modal-header">
-                        <div className="flex flex-col">
-                            <h3 className="font-bold text-sm uppercase tracking-wide text-gray-800">Invoice Details</h3>
-                            <span className="text-xs text-muted font-mono mt-1">{invoice.invoice_number}</span>
+            <div className="history-modal-overlay" onClick={onClose}>
+                <div className="history-modal" onClick={e => e.stopPropagation()}>
+                    <div className="history-modal-header">
+                        <div className="history-modal-title-section">
+                            <h3>Invoice Details</h3>
+                            <span className="history-modal-invoice-number">{invoice.invoice_number}</span>
                         </div>
-                        <button onClick={onClose} className="action-btn border-none hover:bg-transparent">
+                        <button onClick={onClose} className="history-modal-close">
                             <X size={20} />
                         </button>
                     </div>
 
-                    <div className="modal-body custom-scrollbar">
-                        <div className="flex justify-between items-center mb-6 text-sm border-b border-gray-100 pb-4">
-                            <div>
-                                <p className="text-muted text-xs uppercase font-bold mb-1">Customer</p>
-                                <p className="font-semibold text-gray-800">{invoice.customer_name || "Walk-in Customer"}</p>
+                    <div className="history-modal-body">
+                        <div className="history-modal-info">
+                            <div className="history-modal-info-item">
+                                <p>Customer</p>
+                                <p>{invoice.customer_name || "Walk-in Customer"}</p>
                             </div>
-                            <div className="text-right">
-                                <p className="text-muted text-xs uppercase font-bold mb-1">Date</p>
-                                <p className="font-semibold text-gray-800">{new Date(invoice.created_at).toLocaleDateString()}</p>
+                            <div className="history-modal-info-item">
+                                <p>Date</p>
+                                <p>
+                                    {new Date(invoice.created_at).toLocaleDateString('en-IN', { 
+                                        day: 'numeric', 
+                                        month: 'short', 
+                                        year: 'numeric',
+                                        timeZone: 'Asia/Kolkata'
+                                    })}
+                                </p>
                             </div>
                         </div>
 
-                        <div className="border rounded border-gray-200 overflow-hidden">
-                            <table className="w-full text-sm" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="text-left p-3 text-xs font-bold text-muted border-b border-gray-200">Item</th>
-                                        <th className="text-center p-3 text-xs font-bold text-muted border-b border-gray-200">Qty</th>
-                                        <th className="text-right p-3 text-xs font-bold text-muted border-b border-gray-200">Price</th>
+                        <table className="history-modal-items-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Qty</th>
+                                    <th>Price</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {invoice.items && invoice.items.map((item, idx) => (
+                                    <tr key={idx}>
+                                        <td>{item.item_name}</td>
+                                        <td>{item.quantity}</td>
+                                        <td>₹{(item.unit_price * item.quantity).toFixed(2)}</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {invoice.items && invoice.items.map((item, idx) => (
-                                        <tr key={idx} className="border-b border-gray-50 last:border-none">
-                                            <td className="p-3 text-gray-700 font-medium">{item.item_name}</td>
-                                            <td className="p-3 text-center text-muted">{item.quantity}</td>
-                                            <td className="p-3 text-right text-gray-800 font-bold">${(item.unit_price * item.quantity).toFixed(2)}</td>
-                                        </tr>
-                                    ))}
-                                    {(!invoice.items || invoice.items.length === 0) && (
-                                        <tr>
-                                            <td colSpan="3" className="p-4 text-center text-muted italic">Items details not available</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                ))}
+                                {(!invoice.items || invoice.items.length === 0) && (
+                                    <tr>
+                                        <td colSpan="3" style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>
+                                            Items details not available
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
 
-                    <div className="modal-footer">
-                        <div className="flex justify-between items-center mb-4">
-                            <span className="text-muted font-medium text-sm">Total Amount</span>
-                            <span className="text-xl font-bold text-indigo-600">${invoice.total_amount.toFixed(2)}</span>
+                    <div className="history-modal-footer">
+                        <div className="history-modal-total">
+                            <span className="history-modal-total-label">Total Amount</span>
+                            <span className="history-modal-total-amount">₹{invoice.total_amount.toFixed(2)}</span>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="history-modal-buttons">
                             <button
-                                className="btn"
-                                style={{ background: '#10b981' }} // Success color directly
+                                className="history-modal-btn whatsapp"
                                 onClick={(e) => shareWhatsApp(invoice, e)}
                             >
-                                <Smartphone size={16} /> Share on WhatsApp
+                                <Smartphone size={18} /> Share on WhatsApp
+                            </button>
+                            <button
+                                className="history-modal-btn view"
+                                onClick={() => window.open(`/invoice/${invoice.id}`, '_blank')}
+                            >
+                                <Eye size={18} /> View Full Invoice
                             </button>
                         </div>
                     </div>
@@ -130,131 +173,146 @@ const History = () => {
     };
 
     return (
-        <div className="page-container">
-            {/* Header */}
-            <div className="header-section">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 flex items-center justify-center bg-indigo-600 shadow-sm">
-                        <FileText color="white" size={18} />
+        <div className="history-page with-mobile-header-offset">
+            {/* Header Section */}
+            <div className="history-header">
+                <div className="history-title-section">
+                    <div className="history-icon">
+                        <FileText size={20} />
                     </div>
-                    <div className="page-title">
-                        <h1>History</h1>
-                        <p className="text-xs text-muted mt-1">Manage past transactions</p>
-                    </div>
+                    <h1 className="history-title">{pageTitle}</h1>
                 </div>
 
-                <div className="filter-bar">
+                <div className="history-filters">
                     {/* Date Filters */}
-                    <div className="date-input-group">
-                        <Calendar size={14} className="text-muted" />
+                    <div className="date-filter-group">
+                        <Calendar size={16} />
                         <input
                             type="date"
-                            className="date-input"
+                            className="history-date-input"
                             value={startDate}
                             onChange={e => setStartDate(e.target.value)}
                         />
-                        <span className="text-muted">-</span>
+                        <span className="date-separator">-</span>
                         <input
                             type="date"
-                            className="date-input"
+                            className="history-date-input"
                             value={endDate}
                             onChange={e => setEndDate(e.target.value)}
                         />
                     </div>
 
-                    <div className="search-input-wrapper">
-                        <Search className="search-input-icon" size={16} />
+                    {/* Search Input */}
+                    <div className="history-search-wrapper">
+                        <Search className="history-search-icon" size={18} />
                         <input
-                            className="search-input-field"
-                            placeholder="Search invoice or customer..."
+                            className="history-search-input"
+                            placeholder="Search invoice, party or customer..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
+
+                    {/* Download Report Button */}
+                    <button
+                        className="history-download-btn"
+                        onClick={handleDownloadReport}
+                        disabled={downloadingReport || filteredInvoices.length === 0}
+                        title="Download Sales Report PDF"
+                    >
+                        {downloadingReport ? (
+                            <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                        ) : (
+                            <FileDown size={18} />
+                        )}
+                        {downloadingReport ? 'Generating...' : 'Download Report'}
+                    </button>
                 </div>
             </div>
 
             {/* Content Area */}
-            <div className="content-area custom-scrollbar">
-                <div className="data-card">
-                    <div className="data-table-wrapper custom-scrollbar">
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>
-                                        <div className="flex items-center gap-2"><FileText size={14} /> Invoice #</div>
-                                    </th>
-                                    <th>
-                                        <div className="flex items-center gap-2"><Calendar size={14} /> Date</div>
-                                    </th>
-                                    <th>
-                                        <div className="flex items-center gap-2"><User size={14} /> Customer</div>
-                                    </th>
-                                    <th className="text-right">
-                                        <div className="flex items-center gap-2 justify-end"><DollarSign size={14} /> Amount</div>
-                                    </th>
-                                    <th className="text-center">
-                                        Actions
-                                    </th>
+            <div className="history-content">
+                <div className="history-table-container">
+                    <table className="history-table">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th style={{ textAlign: 'right' }}>Amount</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredInvoices.map(inv => (
+                                <tr key={inv.id} onClick={() => setSelectedInvoice(inv)}>
+                                    <td data-label="Invoice #">
+                                        <span className="history-invoice-badge">
+                                            {inv.invoice_number}
+                                        </span>
+                                    </td>
+                                    <td data-label="Date">
+                                        <div className="history-date-cell">
+                                            <span className="history-date-main">
+                                                {new Date(inv.created_at).toLocaleDateString('en-IN', { 
+                                                    day: 'numeric', 
+                                                    month: 'numeric', 
+                                                    year: 'numeric',
+                                                    timeZone: 'Asia/Kolkata'
+                                                })}
+                                            </span>
+                                            <span className="history-date-time">
+                                                {new Date(inv.created_at).toLocaleTimeString('en-IN', { 
+                                                    hour: '2-digit', 
+                                                    minute: '2-digit',
+                                                    hour12: true,
+                                                    timeZone: 'Asia/Kolkata'
+                                                })}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td data-label="Customer">
+                                        <span className="history-customer-name">
+                                            {inv.customer_name || "Walk-in Customer"}
+                                        </span>
+                                    </td>
+                                    <td data-label="Amount">
+                                        <span className="history-amount">
+                                            ₹{inv.total_amount.toFixed(2)}
+                                        </span>
+                                    </td>
+                                    <td data-label="Actions">
+                                        <div className="history-actions">
+                                            <button
+                                                className="history-action-btn"
+                                                title="View Details"
+                                                onClick={(e) => { e.stopPropagation(); setSelectedInvoice(inv); }}
+                                            >
+                                                <Eye size={18} />
+                                            </button>
+                                            <button
+                                                className="history-action-btn whatsapp"
+                                                title="Share on WhatsApp"
+                                                onClick={(e) => shareWhatsApp(inv, e)}
+                                            >
+                                                <Smartphone size={18} />
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {filteredInvoices.map(inv => (
-                                    <tr key={inv.id} onClick={() => setSelectedInvoice(inv)} style={{ cursor: 'pointer' }}>
-                                        <td>
-                                            <span className="id-badge">
-                                                {inv.invoice_number}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div className="flex flex-col">
-                                                <span className="font-bold text-sm text-gray-700">{new Date(inv.created_at).toLocaleDateString()}</span>
-                                                <span className="text-xs text-muted">
-                                                    {new Date(inv.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span className="font-bold text-gray-700">{inv.customer_name || "Walk-in Customer"}</span>
-                                        </td>
-                                        <td className="text-right">
-                                            <span className="font-bold text-gray-900">
-                                                ${inv.total_amount.toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="text-center">
-                                            <div className="flex justify-center">
-                                                <button
-                                                    className="action-btn"
-                                                    title="View Details"
-                                                    onClick={(e) => { e.stopPropagation(); setSelectedInvoice(inv); }}
-                                                >
-                                                    <Eye size={16} />
-                                                </button>
-                                                <button
-                                                    className="action-btn"
-                                                    title="Share on WhatsApp"
-                                                    onClick={(e) => shareWhatsApp(inv, e)}
-                                                >
-                                                    <Smartphone size={16} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {filteredInvoices.length === 0 && (
-                                    <tr>
-                                        <td colSpan="5" className="text-center p-6 text-muted">
-                                            <div className="flex flex-col items-center justify-center p-4">
-                                                <Filter size={32} className="mb-2 opacity-30" />
-                                                <p>No sales found</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                            ))}
+                            {filteredInvoices.length === 0 && (
+                                <tr>
+                                    <td colSpan="5">
+                                        <div className="history-empty-state">
+                                            <Filter size={48} className="history-empty-icon" />
+                                            <p className="history-empty-text">No sales found</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

@@ -3,18 +3,53 @@ __pycache__/
 *.py[cod]
 *$py.class
 .venv/
+.venv_*/
 venv/
 env/
 *.log
+
+# Environment Variables - NEVER commit these
+.env
+.env.local
+.env.production
+.env.development
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+!**/.env.example
+
+# SQLite (legacy - now using MongoDB)
 *.sqlite
 *.db
-sql_app.db
+sql_app*.db
+pos_system.db
+
+# MongoDB
+*.mongodb.js
 
 # Node
 node_modules/
 dist/
 build/
-.env
 .DS_Store
 coverage/
+
+# IDE
+.idea/
 .vscode/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Production artifacts
+*.pem
+*.key
+*.crt
+*.cert
+ssl/
+secrets/

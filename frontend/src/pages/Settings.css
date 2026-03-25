@@ -1,0 +1,101 @@
+/* Settings page - minimal style aligned with POS */
+
+.settings-page {
+    background: #fafafa;
+}
+
+.settings-page .header-section {
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.settings-page .header-section .w-8.h-8 {
+    border-radius: 10px;
+    background: #f3f4f6 !important;
+    box-shadow: none !important;
+}
+
+.settings-page .header-section .w-8.h-8 svg {
+    color: #111827 !important;
+}
+
+.settings-page .settings-content {
+    padding-bottom: 24px;
+}
+
+.settings-page .settings-tabs-wrapper,
+.settings-page .settings-panel,
+.settings-page .mobile-logout-section,
+.settings-page .content-area > .mb-6 {
+    width: min(1200px, 100% - 32px);
+}
+
+.settings-page .settings-tabs-bar {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 10px;
+    box-shadow: none !important;
+    padding: 10px !important;
+    gap: 8px !important;
+}
+
+.settings-page .settings-panel {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+}
+
+.settings-page .settings-panel textarea,
+.settings-page .settings-panel .input {
+    background: #ffffff !important;
+    border-color: #d1d5db !important;
+}
+
+.settings-page .settings-panel button:not(.mobile-nav-button) {
+    border-radius: 8px;
+}
+
+.settings-page .settings-panel button[style*='background-color: rgb(17, 24, 39)'] {
+    background-color: #111827 !important;
+    border-color: #111827 !important;
+    color: #ffffff !important;
+}
+
+.settings-page .settings-panel button[style*='background-color: rgb(17, 24, 39)']:hover {
+    background-color: #1f2937 !important;
+}
+
+@media (max-width: 1023px) {
+    .settings-page .settings-tabs-wrapper,
+    .settings-page .settings-panel,
+    .settings-page .mobile-logout-section,
+    .settings-page .content-area > .mb-6 {
+        width: min(1200px, 100% - 24px);
+    }
+
+    .settings-page .settings-panel {
+        padding: 20px !important;
+    }
+}
+
+@media (max-width: 639px) {
+    .settings-page .settings-tabs-bar {
+        display: grid !important;
+        grid-template-columns: 1fr;
+    }
+
+    .settings-page .settings-tabs-bar button {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+
+    .settings-page .settings-panel {
+        padding: 16px !important;
+    }
+
+    .settings-page .mobile-logout-section {
+        display: block !important;
+        margin-top: 16px !important;
+    }
+}
