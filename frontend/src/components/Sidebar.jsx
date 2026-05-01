@@ -17,15 +17,13 @@ const Sidebar = () => {
     const isRetailer = !isSysAdmin && businessType === 'retailer';
 
     return (
-        <div className="sidebar p-4">
-            <div className="mb-8 p-2 flex flex-col items-center gap-2 text-center">
-                <img src="/logo.png" alt="Logo" className="w-20 h-auto object-contain" />
-                <div>
-                    <h1 className="font-bold leading-none">Ailexity POS</h1>
-                </div>
+        <div className="sidebar">
+            <div className="nav-brand">
+                <img src="/ailexity logo.png" alt="Logo" />
+                <h1>Ailexity POS</h1>
             </div>
 
-            <nav className="flex flex-col gap-2 flex-1">
+            <nav>
                 {/* Dashboard - Only for admin, NOT sysadmin */}
                 {!isSysAdmin && (
                     <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
@@ -95,7 +93,7 @@ const Sidebar = () => {
                         {isRestaurant && user?.enable_order_management && (
                             <NavLink to="/orders" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                                 <Box size={20} />
-                                <span>Online</span>
+                                <span>Online Orders</span>
                             </NavLink>
                         )}
                     </>
@@ -104,7 +102,7 @@ const Sidebar = () => {
                 {/* System Admin - only for sysadmin */}
                 {isSysAdmin && (
                     <>
-                        <div style={{ margin: '0.5rem 0', borderTop: '1px solid #475569' }}></div>
+                        <div style={{ margin: '0.5rem 0', borderTop: '1px solid var(--border-light)' }}></div>
 
                         <NavLink to="/admin" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                             <Shield size={20} />
@@ -119,16 +117,16 @@ const Sidebar = () => {
                 )}
             </nav>
 
-            <div className="mt-auto border-t border-slate-700 pt-4">
-                <div className="p-2 mb-2">
-                    <div className="text-sm font-medium text-main">{user?.username}</div>
-                    <div className="text-xs text-slate-400 capitalize">
+            <div className="sidebar-footer">
+                <div className="user-info">
+                    <div className="user-name">{user?.username}</div>
+                    <div className="user-role">
                         {user?.role}{!isSysAdmin ? ` · ${businessType}` : ''}
                     </div>
                 </div>
 
                 {!isSysAdmin && (
-                    <NavLink to="/settings" className="nav-item mb-2">
+                    <NavLink to="/settings" className="nav-item">
                         <Settings size={20} />
                         <span>Settings</span>
                     </NavLink>

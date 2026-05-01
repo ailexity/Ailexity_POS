@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, ChevronDown } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ChevronDown, Menu, X } from 'lucide-react';
 import './HowItWorks.css';
 
 const HowItWorks = () => {
@@ -103,25 +103,65 @@ const HowItWorks = () => {
 
     const steps = activeTab === 'restaurants' ? restaurantSteps : retailSteps;
 
+    const [bannerVisible, setBannerVisible] = useState(true);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
     return (
-        <div className="how-it-works-page">
-            {/* Navigation */}
-            <nav className="how-nav">
-                <div className="nav-brand">
-                    <img src="/ailexity logo.png" alt="Ailexity" className="nav-logo" />
-                    <span className="nav-text">Ailexity POS</span>
+        <div className="landing-page">
+            {/* Background Pattern */}
+            <div className="bg-pattern"></div>
+
+            {/* Top Banner */}
+            {bannerVisible && (
+                <div className="top-banner">
+                    <div className="banner-content">
+                        <span>📍 Tower-21, Joyville Hadapsar Annexe Shewalewadi Pune, Maharashtra - 412307</span>
+                        <button className="banner-link" onClick={() => navigate('/login')}>Schedule a Meeting →</button>
+                    </div>
+                    <button className="banner-close" onClick={() => setBannerVisible(false)}>×</button>
                 </div>
-                <div className="nav-buttons">
-                    <button className="nav-link" onClick={() => navigate('/')}>Home</button>
-                    <button className="nav-link" onClick={() => navigate('/features')}>Features</button>
-                    <button className="nav-btn" onClick={() => navigate('/login')}>Login</button>
+            )}
+
+            {/* Navigation */}
+            <nav className={`landing-nav ${!bannerVisible ? 'no-banner' : ''}`}>
+                <div className="nav-brand" onClick={() => navigate('/')}>
+                    <img src="/ailexity logo.png" alt="Logo" className="nav-logo" />
+                </div>
+                
+                <div className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+                    <span className="nav-link" onClick={() => navigate('/')}>Home</span>
+                    <span className="nav-link" onClick={() => navigate('/features')}>Features</span>
+                    <span className="nav-link active">Working</span>
+                    <span className="nav-link">Industries <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginLeft: '4px'}}><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
+                    <span className="nav-link">Case Studies</span>
+                </div>
+
+                <div className="nav-actions">
+                    <div className="nav-buttons">
+                        <button className="btn-teal" onClick={() => navigate('/login')}>
+                            Get Started →
+                        </button>
+                    </div>
+                    <button className="mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                        {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                    </button>
                 </div>
             </nav>
 
             {/* Hero */}
-            <section className="how-hero">
-                <h1>How Ailexity POS Works</h1>
-                <p>Simple, intuitive process to transform your business operations</p>
+            <section className="hero" style={{paddingBottom: '40px'}}>
+                <div className="hero-content">
+                    <div className="hero-pill">
+                        <span className="pill-dot"></span> SIMPLE PROCESS
+                    </div>
+                    <h1 className="hero-title" style={{fontSize: '60px'}}>
+                        How Ailexity POS<br/>
+                        <span className="hero-highlight">Works</span>
+                    </h1>
+                    <p className="hero-subtitle">
+                        Simple, intuitive process to transform your business operations and scale easily.
+                    </p>
+                </div>
             </section>
 
             {/* Tab Selection */}

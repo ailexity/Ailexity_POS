@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     ShoppingCart, Package, TrendingUp, Users, BarChart3, 
-    Lock, Zap, Clock, HelpCircle, ArrowRight, CheckCircle2 
+    Lock, Zap, Clock, HelpCircle, ArrowRight, CheckCircle2, Menu, X
 } from 'lucide-react';
 import './FeaturesPage.css';
 
 const FeaturesPage = () => {
     const navigate = useNavigate();
+    const [bannerVisible, setBannerVisible] = useState(true);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const restaurants = [
         {
@@ -99,24 +101,60 @@ const FeaturesPage = () => {
     ];
 
     return (
-        <div className="features-page">
-            {/* Navigation */}
-            <nav className="features-nav">
-                <div className="nav-brand">
-                    <img src="/ailexity logo.png" alt="Ailexity" className="nav-logo" />
-                    <span className="nav-text">Ailexity POS</span>
+        <div className="landing-page">
+            {/* Background Pattern */}
+            <div className="bg-pattern"></div>
+
+            {/* Top Banner */}
+            {bannerVisible && (
+                <div className="top-banner">
+                    <div className="banner-content">
+                        <span>📍 Tower-21, Joyville Hadapsar Annexe Shewalewadi Pune, Maharashtra - 412307</span>
+                        <button className="banner-link" onClick={() => navigate('/login')}>Schedule a Meeting →</button>
+                    </div>
+                    <button className="banner-close" onClick={() => setBannerVisible(false)}>×</button>
                 </div>
-                <div className="nav-buttons">
-                    <button className="nav-link" onClick={() => navigate('/')}>Home</button>
-                    <button className="nav-btn" onClick={() => navigate('/login')}>Login</button>
+            )}
+
+            {/* Navigation */}
+            <nav className={`landing-nav ${!bannerVisible ? 'no-banner' : ''}`}>
+                <div className="nav-brand" onClick={() => navigate('/')}>
+                    <img src="/ailexity logo.png" alt="Logo" className="nav-logo" />
+                </div>
+                
+                <div className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+                    <span className="nav-link" onClick={() => navigate('/')}>Home</span>
+                    <span className="nav-link active">Features</span>
+                    <span className="nav-link" onClick={() => navigate('/how-it-works')}>Working</span>
+                    <span className="nav-link">Industries <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginLeft: '4px'}}><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
+                    <span className="nav-link" onClick={() => navigate('/how-it-works')}>Case Studies</span>
+                </div>
+
+                <div className="nav-actions">
+                    <div className="nav-buttons">
+                        <button className="btn-teal" onClick={() => navigate('/login')}>
+                            Get Started →
+                        </button>
+                    </div>
+                    <button className="mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                        {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                    </button>
                 </div>
             </nav>
 
             {/* Hero */}
-            <section className="features-hero">
-                <div className="features-hero-content">
-                    <h1>Powerful Features Built for Your Business</h1>
-                    <p>Everything you need to run your business efficiently and grow confidently</p>
+            <section className="hero">
+                <div className="hero-content">
+                    <div className="hero-pill">
+                        <span className="pill-dot"></span> POWERFUL CAPABILITIES
+                    </div>
+                    <h1 className="hero-title" style={{fontSize: '60px'}}>
+                        Features Built for<br/>
+                        <span className="hero-highlight">Your Business</span>
+                    </h1>
+                    <p className="hero-subtitle">
+                        Everything you need to run your business efficiently and grow confidently.
+                    </p>
                 </div>
             </section>
 
