@@ -1,0 +1,57 @@
+{
+  "intents": [
+    {
+      "tag": "greeting",
+      "patterns": [
+        "Hi",
+        "Hello",
+        "Good morning",
+        "Good evening",
+        "Hey there"
+      ],
+      "responses": [
+        "Hello! Welcome to our restaurant. How can I help you today?",
+        "Hi there! What can I assist you with?"
+      ]
+    },
+    {
+      "tag": "menu_inquiry",
+      "patterns": [
+        "What's on the menu?",
+        "Show me the menu",
+        "What do you serve?",
+        "What food do you have?"
+      ],
+      "responses": [
+        "We have a variety of dishes available. Would you like to see our menu?",
+        "Our menu includes appetizers, main courses, and desserts. What are you interested in?"
+      ]
+    },
+    {
+      "tag": "reservation",
+      "patterns": [
+        "I want to make a reservation",
+        "Book a table",
+        "Reserve a table",
+        "Can I book a table?"
+      ],
+      "responses": [
+        "I'd be happy to help you make a reservation. For how many people and what time?",
+        "Sure! When would you like to reserve a table?"
+      ]
+    },
+    {
+      "tag": "goodbye",
+      "patterns": [
+        "Bye",
+        "Goodbye",
+        "See you later",
+        "Thanks"
+      ],
+      "responses": [
+        "Goodbye! Have a great day!",
+        "Thank you for visiting. Come back soon!"
+      ]
+    }
+  ]
+}

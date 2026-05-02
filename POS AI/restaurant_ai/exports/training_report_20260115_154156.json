@@ -1,0 +1,95 @@
+{
+  "train_accuracy": 1.0,
+  "val_accuracy": 0.7941176470588235,
+  "cv_mean": 0.5661375661375662,
+  "cv_std": 0.049066764526432306,
+  "classification_report": {
+    "ai_daily_advice": {
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.8,
+      "support": 3.0
+    },
+    "customer_feedback": {
+      "precision": 0.5,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.5714285714285714,
+      "support": 3.0
+    },
+    "goodbye": {
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1-score": 0.6666666666666666,
+      "support": 2.0
+    },
+    "greeting": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 2.0
+    },
+    "menu_inquiry": {
+      "precision": 0.75,
+      "recall": 1.0,
+      "f1-score": 0.8571428571428571,
+      "support": 3.0
+    },
+    "order_status": {
+      "precision": 0.6,
+      "recall": 1.0,
+      "f1-score": 0.75,
+      "support": 3.0
+    },
+    "payment_analysis": {
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.8,
+      "support": 3.0
+    },
+    "peak_hours": {
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.8,
+      "support": 3.0
+    },
+    "profit_margin_analysis": {
+      "precision": 0.75,
+      "recall": 1.0,
+      "f1-score": 0.8571428571428571,
+      "support": 3.0
+    },
+    "sales_overview": {
+      "precision": 0.75,
+      "recall": 1.0,
+      "f1-score": 0.8571428571428571,
+      "support": 3.0
+    },
+    "stock_status": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 3.0
+    },
+    "top_items": {
+      "precision": 1.0,
+      "recall": 0.3333333333333333,
+      "f1-score": 0.5,
+      "support": 3.0
+    },
+    "accuracy": 0.7941176470588235,
+    "macro avg": {
+      "precision": 0.8624999999999999,
+      "recall": 0.7916666666666666,
+      "f1-score": 0.7882936507936508,
+      "support": 34.0
+    },
+    "weighted avg": {
+      "precision": 0.8544117647058824,
+      "recall": 0.7941176470588235,
+      "f1-score": 0.7856442577030812,
+      "support": 34.0
+    }
+  },
+  "n_samples": 170,
+  "n_classes": 12
+}

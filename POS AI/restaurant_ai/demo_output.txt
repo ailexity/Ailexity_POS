@@ -1,0 +1,36 @@
+INFO:models.intent_classifier:Initialized IntentClassifier with logistic model and tfidf vectorizer
+INFO:models.intent_classifier:Model loaded from trained_models\model_logistic_20260115_162943.pkl
+INFO:models.response_engine:ResponseEngine initialized
+INFO:services.data_fetcher:DataFetcher initialized in mock mode
+INFO:models.response_engine:Generated response for intent: sales_overview
+
+======================================================================
+  RESTAURANT AI - COMPREHENSIVE DEMO
+======================================================================
+
+Loading Model: trained_models\model_logistic_20260115_162943.pkl
+Model loaded successfully!
+Response engine initialized!
+Data fetcher ready!
+
+======================================================================
+  Sales & Revenue Queries
+======================================================================
+
+[WARN] Query: "What were today's sales?"
+   Intent: sales_overview
+   Confidence: 40.5%
+Traceback (most recent call last):
+  File "d:\Ailexity POS\POS AI\restaurant_ai\demo.py", line 138, in <module>
+    main()
+    ~~~~^^
+  File "d:\Ailexity POS\POS AI\restaurant_ai\demo.py", line 127, in main
+    process_query(query, classifier, response_engine, data_fetcher)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\Ailexity POS\POS AI\restaurant_ai\demo.py", line 34, in process_query
+    print(f"   Response: {response[:200]}{'...' if len(response) > 200 else ''}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f4ca' in position 13: character maps to <undefined>
