@@ -23,97 +23,90 @@ const Sidebar = () => {
                 <h1>Ailexity POS</h1>
             </div>
 
-            <nav>
-                {/* Dashboard - Only for admin, NOT sysadmin */}
+            <div className="sidebar-status">
+                <span className="sidebar-status-badge">
+                    {isSysAdmin ? 'Sysadmin Workspace' : businessType === 'retailer' ? 'Retailer Workspace' : 'Restaurant Workspace'}
+                </span>
                 {!isSysAdmin && (
-                    <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                        <Home size={20} />
-                        <span>Dashboard</span>
-                    </NavLink>
+                    <p className="sidebar-status-copy">
+                        {isRetailer
+                            ? 'Organized for invoices, stock flow, party credit, and ledger control.'
+                            : 'Organized for fast billing, kitchen inventory, and online order flow.'}
+                    </p>
                 )}
+            </div>
 
-                {/* System Dashboard - Only sysadmin */}
-                {isSysAdmin && (
-                    <NavLink to="/system" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                        <BarChart3 size={20} />
-                        <span>System Dashboard</span>
-                    </NavLink>
-                )}
-
-                {/* Only show POS, History, Items to admin - NOT sysadmin */}
+            <nav>
                 {!isSysAdmin && (
                     <>
-                        <NavLink to="/pos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                            <ShoppingCart size={20} />
-                            <span>Billing</span>
-                        </NavLink>
-
-                        {isRestaurant && (
+                        <div className="sidebar-group">
+                            <div className="sidebar-group-title">Core tools</div>
+                            <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                <Home size={20} />
+                                <span>Dashboard</span>
+                            </NavLink>
+                            <NavLink to="/pos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                <ShoppingCart size={20} />
+                                <span>Billing</span>
+                            </NavLink>
                             <NavLink to="/history" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                                 <FileText size={20} />
-                                <span>History</span>
+                                <span>{isRetailer ? 'Invoices' : 'History'}</span>
                             </NavLink>
-                        )}
-
-                        {isRetailer && (
-                            <NavLink to="/history" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <FileText size={20} />
-                                <span>Invoices</span>
-                            </NavLink>
-                        )}
+                        </div>
 
                         {isRestaurant && (
-                            <NavLink to="/items" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <Package size={20} />
-                                <span>Inventory</span>
-                            </NavLink>
+                            <div className="sidebar-group">
+                                <div className="sidebar-group-title">Restaurant features</div>
+                                <NavLink to="/items" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                    <Package size={20} />
+                                    <span>Inventory</span>
+                                </NavLink>
+                                {user?.enable_order_management && (
+                                    <NavLink to="/orders" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                        <Box size={20} />
+                                        <span>Online Orders</span>
+                                    </NavLink>
+                                )}
+                            </div>
                         )}
 
                         {isRetailer && (
-                            <NavLink to="/stock" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <Boxes size={20} />
-                                <span>Stock</span>
-                            </NavLink>
-                        )}
-
-                        {isRetailer && (
-                            <NavLink to="/parties" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <Users size={20} />
-                                <span>Parties</span>
-                            </NavLink>
-                        )}
-
-                        {isRetailer && (
-                            <NavLink to="/ledger" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <DollarSign size={20} />
-                                <span>Ledger</span>
-                            </NavLink>
-                        )}
-
-                        {isRestaurant && user?.enable_order_management && (
-                            <NavLink to="/orders" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <Box size={20} />
-                                <span>Online Orders</span>
-                            </NavLink>
+                            <div className="sidebar-group">
+                                <div className="sidebar-group-title">Retailer features</div>
+                                <NavLink to="/stock" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                    <Boxes size={20} />
+                                    <span>Stock</span>
+                                </NavLink>
+                                <NavLink to="/parties" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                    <Users size={20} />
+                                    <span>Parties</span>
+                                </NavLink>
+                                <NavLink to="/ledger" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                    <DollarSign size={20} />
+                                    <span>Ledger</span>
+                                </NavLink>
+                            </div>
                         )}
                     </>
                 )}
 
-                {/* System Admin - only for sysadmin */}
                 {isSysAdmin && (
-                    <>
-                        <div style={{ margin: '0.5rem 0', borderTop: '1px solid var(--border-light)' }}></div>
-
+                    <div className="sidebar-group">
+                        <div className="sidebar-group-title">Admin tools</div>
+                        <NavLink to="/system" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                            <BarChart3 size={20} />
+                            <span>System Dashboard</span>
+                        </NavLink>
                         <NavLink to="/admin" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                             <Shield size={20} />
                             <span>System Admin</span>
                         </NavLink>
-
                         <NavLink to="/alerts" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                             <Bell size={20} />
                             <span>Alerts</span>
                         </NavLink>
-                    </>
+                    </div>
                 )}
             </nav>
 

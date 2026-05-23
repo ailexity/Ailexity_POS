@@ -204,27 +204,67 @@ def _get_public_invoice_data(invoice_id: str, db: Database):
 
 @router.get("/", response_model=List[schemas.InvoiceResponse])
 def read_invoices(
-    skip: int = 0, 
-    limit: int = 100, 
-    db: Database = Depends(database.get_db), 
+    skip: int = 0,
+    limit: int = 100,
+    search: str = "",
+    start_date: str = "",
+    end_date: str = "",
+    response: Response = None,
+    db: Database = Depends(database.get_db),
     current_user: dict = Depends(auth.get_current_active_user)
 ):
-    """Get invoices - filtered by admin_id for multi-tenant isolation"""
+    """Get invoices - filtered by admin_id with optional search and date range."""
+    query = {} if current_user.get("role") == 'sysadmin' else {"admin_id": current_user["id"]}
+
+    search = (search or "").strip()
+    if search:
+        search_regex = {"$regex": search, "$options": "i"}
+        query["$or"] = [
+            {"invoice_number": search_regex},
+            {"customer_name": search_regex},
+            {"customer_phone": search_regex}
+        ]
+
+    try:
+        if start_date:
+            start = datetime.fromisoformat(start_date)
+            start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+            query.setdefault("created_at", {})["$gte"] = start
+    except Exception:
+        pass
+
+    try:
+        if end_date:
+            end = datetime.fromisoformat(end_date)
+            end = end.replace(hour=23, minute=59, second=59, microsecond=999999)
+            query.setdefault("created_at", {})["$lte"] = end
+    except Exception:
+        pass
+
+    total_count = database.invoices_collection.count_documents(query)
+    invoices = list(
+        database.invoices_collection.find(query)
+        .sort("created_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+
+    # Enrich invoices with admin store details when sysadmin is viewing
+    admin_map = {}
     if current_user.get("role") == 'sysadmin':
-        # SysAdmin can see all invoices
-        invoices = list(database.invoices_collection.find({}).sort("created_at", -1).skip(skip).limit(limit))
+        admin_ids = list({invoice.get("admin_id") for invoice in invoices if invoice.get("admin_id")})
+        if admin_ids:
+            object_ids = [ObjectId(admin_id) for admin_id in admin_ids if ObjectId.is_valid(admin_id)]
+            if object_ids:
+                for admin in database.users_collection.find({"_id": {"$in": object_ids}}):
+                    admin_map[str(admin["_id"])] = admin
     else:
-        # Admin sees only their own invoices
-        invoices = list(database.invoices_collection.find(
-            {"admin_id": current_user["id"]}
-        ).sort("created_at", -1).skip(skip).limit(limit))
-    
-    # Enrich invoices with admin store details
+        admin_map = {current_user["id"]: current_user}
+
     result = []
     for invoice in invoices:
         invoice_dict = serialize_doc(invoice)
-        # Get admin details
-        admin = database.users_collection.find_one({"_id": ObjectId(invoice["admin_id"])})
+        admin = admin_map.get(str(invoice.get("admin_id")))
         if admin:
             invoice_dict['business_name'] = admin.get('business_name')
             invoice_dict['business_address'] = admin.get('business_address')
@@ -239,8 +279,36 @@ def read_invoices(
             invoice_dict['invoice_notes'] = admin.get('invoice_notes')
             invoice_dict['invoice_terms'] = admin.get('invoice_terms')
         result.append(invoice_dict)
-    
+
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total_count)
     return result
+
+@router.get("/top-products")
+def get_top_products(
+    limit: int = 5,
+    db: Database = Depends(database.get_db),
+    current_user: dict = Depends(auth.get_current_active_user)
+):
+    """Get top selling products across invoices."""
+    match = {} if current_user.get("role") == 'sysadmin' else {"admin_id": current_user["id"]}
+    pipeline = [
+        {"$match": match},
+        {"$unwind": "$items"},
+        {"$group": {
+            "_id": "$items.item_name",
+            "qty": {"$sum": {"$ifNull": ["$items.quantity", 0]}},
+            "value": {"$sum": {"$ifNull": ["$items.total_price", 0]}}
+        }},
+        {"$sort": {"qty": -1}},
+        {"$limit": limit}
+    ]
+    results = list(database.invoices_collection.aggregate(pipeline))
+    return [{
+        "name": item["_id"],
+        "qty": item.get("qty", 0),
+        "value": item.get("value", 0)
+    } for item in results]
 
 @router.get("/public/{invoice_id}", response_model=schemas.InvoiceResponse)
 def get_public_invoice(invoice_id: str, db: Database = Depends(database.get_db)):
@@ -404,105 +472,106 @@ def get_statistics(
     db: Database = Depends(database.get_db),
     current_user: dict = Depends(auth.get_current_active_user)
 ):
-    """Get dashboard statistics - optimized endpoint"""
+    """Get dashboard statistics - optimized endpoint using MongoDB aggregation."""
     try:
         if current_user.get("role") == 'sysadmin':
-            invoices = list(database.invoices_collection.find({}))
-            items = list(database.items_collection.find({}))
+            match = {}
         else:
-            invoices = list(database.invoices_collection.find({"admin_id": current_user["id"]}))
-            items = list(database.items_collection.find({"admin_id": current_user["id"]}))
-        
-        # Helper function to safely parse datetime - make timezone-naive for comparison
-        def parse_invoice_date(inv):
-            try:
-                created_at = inv.get('created_at')
-                if isinstance(created_at, datetime):
-                    # Remove timezone info for comparison
-                    return created_at.replace(tzinfo=None) if created_at.tzinfo else created_at
-                elif isinstance(created_at, str):
-                    # Handle ISO format with or without 'Z'
-                    date_str = created_at.replace('Z', '+00:00')
-                    dt = datetime.fromisoformat(date_str)
-                    # Remove timezone info
-                    return dt.replace(tzinfo=None)
-                else:
-                    return datetime.now()
-            except Exception as e:
-                return datetime.now()
-        
-        # Calculate statistics
-        total_revenue = sum(inv.get('total_amount', 0) for inv in invoices)
-        
-        # Use timezone-naive datetime for comparison
+            match = {"admin_id": current_user["id"]}
+
         now = datetime.now()
         today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        
-        # Today's stats - compare timezone-naive datetimes
-        today_invoices = [inv for inv in invoices if parse_invoice_date(inv) >= today]
-        today_revenue = sum(inv.get('total_amount', 0) for inv in today_invoices)
-        
-        # Yesterday's stats
         yesterday = today - timedelta(days=1)
-        yesterday_invoices = [inv for inv in invoices if yesterday <= parse_invoice_date(inv) < today]
-        yesterday_revenue = sum(inv.get('total_amount', 0) for inv in yesterday_invoices)
-        
-        # Week stats
         week_start = today - timedelta(days=today.weekday())
-        week_invoices = [inv for inv in invoices if parse_invoice_date(inv) >= week_start]
-        week_revenue = sum(inv.get('total_amount', 0) for inv in week_invoices)
-        
-        # Month stats
         month_start = today.replace(day=1)
-        month_invoices = [inv for inv in invoices if parse_invoice_date(inv) >= month_start]
-        month_revenue = sum(inv.get('total_amount', 0) for inv in month_invoices)
-        
-        # Low stock items
-        low_stock_items = len([item for item in items if item.get('limit_stock') and item.get('stock_quantity', 0) < 10])
-        
-        # Payment modes
+
+        def build_date_filter(start, end=None):
+            date_filter = {"created_at": {"$gte": start}}
+            if end is not None:
+                date_filter["created_at"]["$lt"] = end
+            q = dict(match)
+            q.update(date_filter)
+            return q
+
+        totals_doc = next(database.invoices_collection.aggregate([
+            {"$match": match},
+            {"$group": {
+                "_id": None,
+                "totalRevenue": {"$sum": {"$ifNull": ["$total_amount", 0]}},
+                "totalOrders": {"$sum": 1},
+                "totalItems": {"$sum": {"$size": {"$ifNull": ["$items", []]}}}
+            }}
+        ]), None) or {}
+
+        def range_stats(start, end=None):
+            q = build_date_filter(start, end)
+            doc = next(database.invoices_collection.aggregate([
+                {"$match": q},
+                {"$group": {
+                    "_id": None,
+                    "revenue": {"$sum": {"$ifNull": ["$total_amount", 0]}},
+                    "orders": {"$sum": 1}
+                }}
+            ]), None) or {}
+            return doc.get("revenue", 0), doc.get("orders", 0)
+
+        def range_profit(start, end=None):
+            q = build_date_filter(start, end)
+            doc = next(database.invoices_collection.aggregate([
+                {"$match": q},
+                {"$unwind": {"path": "$items", "preserveNullAndEmptyArrays": True}},
+                {"$group": {
+                    "_id": None,
+                    "profit": {"$sum": {"$ifNull": ["$items.profit", 0]}}
+                }}
+            ]), None) or {}
+            return doc.get("profit", 0)
+
+        today_revenue, today_orders = range_stats(today)
+        yesterday_revenue, yesterday_orders = range_stats(yesterday, today)
+        week_revenue, week_orders = range_stats(week_start)
+        month_revenue, month_orders = range_stats(month_start)
+        today_profit = range_profit(today)
+        month_profit = range_profit(month_start)
+
         payment_modes = {}
-        for inv in invoices:
-            mode = inv.get('payment_mode', 'Cash')
-            payment_modes[mode] = payment_modes.get(mode, 0) + 1
-        
-        # Hourly data for today
+        for mode_doc in database.invoices_collection.aggregate([
+            {"$match": match},
+            {"$group": {"_id": {"$ifNull": ["$payment_mode", "Cash"]}, "count": {"$sum": 1}}}
+        ]):
+            payment_modes[mode_doc["_id"]] = mode_doc.get("count", 0)
+
         hourly_data = [0] * 24
-        for inv in today_invoices:
-            try:
-                inv_dt = parse_invoice_date(inv)
-                hour = inv_dt.hour
-                hourly_data[hour] += inv.get('total_amount', 0)
-            except Exception:
-                continue
-        
-        # Calculate profit for today and month
-        def calculate_profit(invoices):
-            total_profit = 0.0
-            for inv in invoices:
-                items = inv.get('items', [])
-                for item in items:
-                    # Get profit from item (already calculated in InvoiceItemDocument)
-                    total_profit += item.get('profit', 0.0)
-            return total_profit
-        
-        today_profit = calculate_profit(today_invoices)
-        month_profit = calculate_profit(month_invoices)
-        
+        for hour_doc in database.invoices_collection.aggregate([
+            {"$match": build_date_filter(today)},
+            {"$group": {"_id": {"$hour": "$created_at"}, "amount": {"$sum": {"$ifNull": ["$total_amount", 0]}}}}
+        ]):
+            hour = hour_doc.get("_id")
+            if isinstance(hour, int) and 0 <= hour < 24:
+                hourly_data[hour] = hour_doc.get("amount", 0)
+
+        low_stock_filter = dict(match)
+        low_stock_filter.update({"limit_stock": True, "stock_quantity": {"$lt": 10}})
+        low_stock_items = database.items_collection.count_documents(low_stock_filter)
+
+        total_revenue = totals_doc.get("totalRevenue", 0)
+        total_orders = totals_doc.get("totalOrders", 0)
+        total_items = totals_doc.get("totalItems", 0)
+
         return {
             "totalRevenue": total_revenue,
-            "totalOrders": len(invoices),
-            "totalItems": len(items),
-            "avgOrderValue": total_revenue / len(invoices) if invoices else 0,
+            "totalOrders": total_orders,
+            "totalItems": total_items,
+            "avgOrderValue": total_revenue / total_orders if total_orders else 0,
             "todayRevenue": today_revenue,
-            "todayOrders": len(today_invoices),
+            "todayOrders": today_orders,
             "todayProfit": today_profit,
             "yesterdayRevenue": yesterday_revenue,
-            "yesterdayOrders": len(yesterday_invoices),
+            "yesterdayOrders": yesterday_orders,
             "weekRevenue": week_revenue,
-            "weekOrders": len(week_invoices),
+            "weekOrders": week_orders,
             "monthRevenue": month_revenue,
-            "monthOrders": len(month_invoices),
+            "monthOrders": month_orders,
             "monthProfit": month_profit,
             "lowStockItems": low_stock_items,
             "paymentModes": payment_modes,
@@ -512,7 +581,6 @@ def get_statistics(
         print(f"Error in statistics endpoint: {e}")
         import traceback
         traceback.print_exc()
-        # Return empty statistics on error
         return {
             "totalRevenue": 0,
             "totalOrders": 0,

@@ -1,22 +1,20 @@
     import axios from 'axios';
 
-// Use environment variable for API URL - NO FALLBACK for production
-// For production, this MUST be set to relative path: /api
-// For local dev, set to: http://localhost:8000
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+// Use environment variable for API URL when available.
+// In production, this should be a relative path: /api
+// In development, the dev proxy or localhost backend is used.
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '/api');
 
-// Fail fast if VITE_API_URL is not configured
-if (!API_BASE_URL) {
+if (import.meta.env.PROD && !import.meta.env.VITE_API_URL) {
     throw new Error(
-        '❌ VITE_API_URL is not configured!\n' +
+        '❌ VITE_API_URL must be configured for production!\n' +
         'Create frontend/.env with:\n' +
-        '  Development: VITE_API_URL=http://localhost:8000\n' +
-        '  Production:  VITE_API_URL=/api'
+        '  VITE_API_URL=/api'
     );
 }
 
 const api = axios.create({
-    baseURL: API_BASE_URL,
+    baseURL: API_BASE_URL.replace(/\/$/, ''),
     timeout: 30000,  // Increased to 30 seconds
 });
 

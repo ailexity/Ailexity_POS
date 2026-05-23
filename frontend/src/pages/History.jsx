@@ -11,23 +11,49 @@ const History = () => {
     const pageTitle = businessType === 'retailer' ? 'Invoices' : 'History';
     const [invoices, setInvoices] = useState([]);
     const [search, setSearch] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
+    const [page, setPage] = useState(0);
+    const pageSize = 25;
+    const [totalCount, setTotalCount] = useState(0);
+    const [loading, setLoading] = useState(false);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [downloadingReport, setDownloadingReport] = useState(false);
 
     useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search.trim());
+            setPage(0);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    useEffect(() => {
         const fetchInvoices = async () => {
+            setLoading(true);
             try {
-                const res = await api.get('/invoices/');
+                const params = {
+                    skip: page * pageSize,
+                    limit: pageSize,
+                };
+                if (debouncedSearch) params.search = debouncedSearch;
+                if (startDate) params.start_date = startDate;
+                if (endDate) params.end_date = endDate;
+
+                const res = await api.get('/invoices/', { params });
                 setInvoices(Array.isArray(res.data) ? res.data : []);
+                setTotalCount(Number(res.headers['x-total-count'] || res.headers['X-Total-Count'] || 0));
             } catch (e) {
                 console.error("Failed to fetch invoices", e);
                 setInvoices([]);
+                setTotalCount(0);
+            } finally {
+                setLoading(false);
             }
         };
         fetchInvoices();
-    }, []);
+    }, [debouncedSearch, startDate, endDate, page]);
 
     const shareWhatsApp = (invoice, e) => {
         e.stopPropagation();
@@ -37,34 +63,9 @@ const History = () => {
         window.open(url, '_blank');
     };
 
-    const isDateInRange = (dateStr) => {
-        if (!startDate && !endDate) return true;
-        const d = new Date(dateStr);
-        d.setHours(0, 0, 0, 0);
-
-        if (startDate) {
-            const start = new Date(startDate);
-            start.setHours(0, 0, 0, 0);
-            if (d < start) return false;
-        }
-        if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            if (d > end) return false;
-        }
-        return true;
-    };
-
-    const filteredInvoices = invoices.filter(inv => {
-        const matchesSearch =
-            inv.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
-            (inv.customer_name && inv.customer_name.toLowerCase().includes(search.toLowerCase()));
-        const matchesDate = isDateInRange(inv.created_at);
-        return matchesSearch && matchesDate;
-    });
 
     const handleDownloadReport = async () => {
-        if (filteredInvoices.length === 0) {
+        if (invoices.length === 0) {
             alert('No invoices to generate report');
             return;
         }
@@ -72,7 +73,7 @@ const History = () => {
         setDownloadingReport(true);
         try {
             await downloadHistoryReport({
-                invoices: filteredInvoices,
+                invoices,
                 startDate,
                 endDate,
                 userInfo: user
@@ -191,14 +192,14 @@ const History = () => {
                             type="date"
                             className="history-date-input"
                             value={startDate}
-                            onChange={e => setStartDate(e.target.value)}
+                            onChange={e => { setStartDate(e.target.value); setPage(0); }}
                         />
                         <span className="date-separator">-</span>
                         <input
                             type="date"
                             className="history-date-input"
                             value={endDate}
-                            onChange={e => setEndDate(e.target.value)}
+                            onChange={e => { setEndDate(e.target.value); setPage(0); }}
                         />
                     </div>
 
@@ -217,7 +218,7 @@ const History = () => {
                     <button
                         className="history-download-btn"
                         onClick={handleDownloadReport}
-                        disabled={downloadingReport || filteredInvoices.length === 0}
+                        disabled={downloadingReport || invoices.length === 0}
                         title="Download Sales Report PDF"
                     >
                         {downloadingReport ? (
@@ -244,7 +245,7 @@ const History = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredInvoices.map(inv => (
+                            {invoices.map(inv => (
                                 <tr key={inv.id} onClick={() => setSelectedInvoice(inv)}>
                                     <td data-label="Invoice #">
                                         <span className="history-invoice-badge">
@@ -301,7 +302,7 @@ const History = () => {
                                     </td>
                                 </tr>
                             ))}
-                            {filteredInvoices.length === 0 && (
+                            {invoices.length === 0 && !loading && (
                                 <tr>
                                     <td colSpan="5">
                                         <div className="history-empty-state">
@@ -311,8 +312,37 @@ const History = () => {
                                     </td>
                                 </tr>
                             )}
+                            {loading && (
+                                <tr>
+                                    <td colSpan="5" style={{ textAlign: 'center', padding: '24px' }}>
+                                        Loading invoices...
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
+                </div>
+
+                <div className="history-pagination">
+                    <span>
+                        Showing {Math.min((page * pageSize) + 1, totalCount || 0)} - {Math.min((page + 1) * pageSize, totalCount || 0)} of {totalCount} invoices
+                    </span>
+                    <div>
+                        <button
+                            className="history-pagination-btn"
+                            disabled={page === 0 || loading}
+                            onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+                        >
+                            Previous
+                        </button>
+                        <button
+                            className="history-pagination-btn"
+                            disabled={(page + 1) * pageSize >= totalCount || loading}
+                            onClick={() => setPage((prev) => prev + 1)}
+                        >
+                            Next
+                        </button>
+                    </div>
                 </div>
             </div>
 

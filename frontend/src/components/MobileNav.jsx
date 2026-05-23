@@ -28,12 +28,9 @@ const MobileNav = () => {
                     <NavLink to="/pos" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Billing" title="Billing">
                         <ShoppingBag size={20} />
                     </NavLink>
-
-                    {isRestaurant && (
-                        <NavLink to="/history" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="History" title="History">
-                            <FileText size={20} />
-                        </NavLink>
-                    )}
+                    <NavLink to="/history" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="History" title={isRetailer ? 'Invoices' : 'History'}>
+                        <FileText size={20} />
+                    </NavLink>
 
                     {isRestaurant && (
                         <NavLink to="/items" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Inventory" title="Inventory">
@@ -44,6 +41,12 @@ const MobileNav = () => {
                     {isRetailer && (
                         <NavLink to="/stock" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Stock" title="Stock">
                             <Boxes size={20} />
+                        </NavLink>
+                    )}
+
+                    {isRestaurant && user?.enable_order_management && (
+                        <NavLink to="/orders" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Online Orders" title="Online Orders">
+                            <Package size={20} />
                         </NavLink>
                     )}
 

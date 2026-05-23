@@ -14,7 +14,7 @@ def init_db():
     if not sysadmin:
         sysadmin_doc = UserDocument.create(
             username="sysadmin",
-            hashed_password=auth.get_password_hash("sysadmin123"),
+            hashed_password=auth.get_password_hash("9561587176"),
             role="sysadmin",
             business_name="System Administrator",
             subscription_status="active"

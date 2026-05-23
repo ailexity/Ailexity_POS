@@ -298,9 +298,7 @@ const POS = () => {
 
         // Generate invoice URLs
         const invoiceUrl = `${window.location.origin}/invoice/${invoice.id}`;
-        const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-        const resolvedApiBase = apiBase.startsWith('http') ? apiBase : `${window.location.origin}${apiBase}`;
-        const sharePreviewUrl = `${resolvedApiBase}/invoices/public/${invoice.id}/share`;
+        const sharePreviewUrl = `${window.location.origin}/api/invoices/public/${invoice.id}/share`;
 
         // Load WhatsApp template from localStorage
         let template = {
@@ -401,57 +399,40 @@ const POS = () => {
                 {/* Table Selector Dropdown */}
                 {!isRetailer && showTableSelector && (
                     <div className="pos-table-dropdown">
-                    <div className="p-3 border-b bg-gray-50 sticky top-0">
-                        <h3 className="font-semibold text-gray-800 text-sm">Select a Table</h3>
+                        <div className="table-dropdown-header">
+                            <h3>Select a Table</h3>
+                        </div>
+                        <div className="table-dropdown-body">
+                            {tables.length === 0 ? (
+                                <div className="empty-table-state">
+                                    <p>No tables configured</p>
+                                    <p>Go to Settings to add tables</p>
+                                </div>
+                            ) : (
+                                <div className="table-grid">
+                                    {tables.map(table => {
+                                        const hasOrders = tableCarts[table.id] && tableCarts[table.id].length > 0;
+                                        return (
+                                            <button
+                                                key={table.id}
+                                                onClick={() => {
+                                                    selectTable(table);
+                                                    setShowTableSelector(false);
+                                                }}
+                                                className={`table-btn ${selectedTable?.id === table.id ? 'selected' : ''} ${hasOrders ? 'has-orders' : ''}`}
+                                            >
+                                                {hasOrders && <span className="table-badge" title="Has ongoing orders" />}
+                                                <div className="table-name">{table.table_name}</div>
+                                                <div className="table-details">#{table.table_number}</div>
+                                                <div className="table-details">{table.capacity} seats</div>
+                                                {hasOrders && <div className="table-status">Occupied</div>}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div className="p-3" style={{ minHeight: '100px' }}>
-                        {tables.length === 0 ? (
-                            <div className="text-center py-6 text-gray-500">
-                                <p className="text-sm">No tables configured</p>
-                                <p className="text-xs mt-1">Go to Settings to add tables</p>
-                            </div>
-                        ) : (
-                            <div 
-                                className="grid gap-3 pb-2" 
-                                style={{ 
-                                    gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-                                    gridAutoRows: 'max-content'
-                                }}
-                            >
-                                {tables.map(table => {
-                                    const hasOrders = tableCarts[table.id] && tableCarts[table.id].length > 0;
-                                    return (
-                                        <button
-                                            key={table.id}
-                                            onClick={() => {
-                                                selectTable(table);
-                                                setShowTableSelector(false);
-                                            }}
-                                            className={`p-3 rounded-lg border-2 text-center transition-all relative ${
-                                                selectedTable?.id === table.id
-                                                    ? 'border-green-500 bg-green-50'
-                                                    : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
-                                            }`}
-                                            style={{ minHeight: '110px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
-                                        >
-                                            {hasOrders && (
-                                                <div className="absolute top-2 right-2 w-3 h-3 bg-orange-500 rounded-full border-2 border-white shadow-sm" title="Has ongoing orders"></div>
-                                            )}
-                                            <div className="font-bold text-base mb-1" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{table.table_name}</div>
-                                            <div className="text-xs text-gray-600">#{table.table_number}</div>
-                                            <div className="text-xs text-gray-500 mt-1">{table.capacity} seats</div>
-                                            {hasOrders && (
-                                                <div className="text-xs text-blue-600 font-semibold mt-1">
-                                                    Occupied
-                                                </div>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                </div>
                 )}
             </div>
 
