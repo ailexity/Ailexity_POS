@@ -12,6 +12,7 @@ import {
     FileText,
     LayoutDashboard,
     Package,
+    RefreshCw,
     ShoppingCart,
     Target,
     TrendingUp,
@@ -22,6 +23,7 @@ import {
 import api from '../api';
 import AIAssistant from '../components/AIAssistant';
 import PageLoader from '../components/PageLoader';
+import { useAuth } from '../context/AuthContext';
 
 const emptyStats = {
     totalRevenue: 0,
@@ -64,6 +66,7 @@ const emptyPartyInsights = {
 
 const Dashboard = () => {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [businessType, setBusinessType] = useState('restaurant');
     const [stats, setStats] = useState(emptyStats);
     const [loading, setLoading] = useState(true);
@@ -250,6 +253,9 @@ const Dashboard = () => {
     const effectiveMonthlyTarget = monthlyTarget > 0 ? monthlyTarget : (stats.avgOrderValue * 30 * 10);
     const targetProgress = effectiveMonthlyTarget > 0 ? Math.min((stats.monthRevenue / effectiveMonthlyTarget) * 100, 100) : 0;
     const isRetailer = businessType === 'retailer';
+    const businessName = user?.business_name || user?.username || 'Ailexity POS';
+    const displayName = user?.full_name || user?.username || 'Admin';
+    const operatingMode = isRetailer ? 'Retail Operations' : 'Restaurant Operations';
 
     const paymentTotal = Object.values(stats.paymentModes || {}).reduce((sum, value) => sum + Number(value || 0), 0);
     const topPaymentModes = Object.entries(stats.paymentModes || {})
@@ -305,9 +311,9 @@ const Dashboard = () => {
                         </div>
                         <div>
                             <p className="dashboard-eyebrow">{isRetailer ? 'Retail command center' : 'Restaurant command center'}</p>
-                            <h1 className="dashboard-title">{getGreeting()}!</h1>
+                            <h1 className="dashboard-title">{getGreeting()}, {displayName}</h1>
                             <p className="dashboard-subtitle">
-                                {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                {businessName} · {operatingMode}
                             </p>
                         </div>
                     </div>
@@ -319,9 +325,35 @@ const Dashboard = () => {
                                 : 'Keep billing, sales activity, inventory alerts, and order flow visible without jumping screens.'}
                         </p>
                     </div>
+
+                    <div className="dashboard-hero-metrics" aria-label="Dashboard highlights">
+                        <span>
+                            <strong>{formatCurrency(stats.monthRevenue)}</strong>
+                            Month revenue
+                        </span>
+                        <span>
+                            <strong>{stats.lowStockItems}</strong>
+                            Stock alerts
+                        </span>
+                        <span>
+                            <strong>{formatCurrency(stats.avgOrderValue)}</strong>
+                            Avg order
+                        </span>
+                    </div>
                 </div>
 
                 <div className="dashboard-hero-side">
+                    <button
+                        type="button"
+                        className="dashboard-refresh-btn"
+                        onClick={fetchStats}
+                        disabled={loading}
+                        title="Refresh dashboard"
+                        aria-label="Refresh dashboard"
+                    >
+                        <RefreshCw size={16} />
+                        <span>{loading ? 'Refreshing' : 'Refresh'}</span>
+                    </button>
                     <div className="dashboard-time">
                         <div className="dashboard-time-row">
                             <Clock size={16} />
@@ -524,10 +556,10 @@ const Dashboard = () => {
     );
 };
 
-const KpiCard = ({ icon: Icon, label, value, helper, trend, tone }) => (
+const KpiCard = ({ icon, label, value, helper, trend, tone }) => (
     <article className={`dashboard-kpi-card tone-${tone}`}>
         <div className="dashboard-kpi-top">
-            <span className="dashboard-kpi-icon"><Icon size={20} /></span>
+            <span className="dashboard-kpi-icon">{React.createElement(icon, { size: 20 })}</span>
             {trend?.trend && (
                 <span className={`trend-badge ${trend.trend === 'up' ? 'trend-up' : trend.trend === 'down' ? 'trend-down' : ''}`}>
                     {trend.trend === 'down' ? <ArrowDown size={13} /> : <ArrowUp size={13} />}
@@ -541,9 +573,9 @@ const KpiCard = ({ icon: Icon, label, value, helper, trend, tone }) => (
     </article>
 );
 
-const SectionHeader = ({ icon: Icon, title, subtitle, tone, badge }) => (
+const SectionHeader = ({ icon, title, subtitle, tone, badge }) => (
     <div className="dashboard-section-header">
-        <span className={`dashboard-section-icon tone-${tone}`}><Icon size={20} /></span>
+        <span className={`dashboard-section-icon tone-${tone}`}>{React.createElement(icon, { size: 20 })}</span>
         <div>
             <h2>{title}</h2>
             <p>{subtitle}</p>
@@ -612,17 +644,17 @@ const CompareTile = ({ label, value, helper, trend, tone }) => (
     </div>
 );
 
-const MetricTile = ({ icon: Icon, label, value, tone }) => (
+const MetricTile = ({ icon, label, value, tone }) => (
     <div className={`dashboard-metric-tile tone-${tone}`}>
-        <Icon size={22} />
+        {React.createElement(icon, { size: 22 })}
         <strong>{value}</strong>
         <span>{label}</span>
     </div>
 );
 
-const AlertRow = ({ icon: Icon, title, copy, tone }) => (
+const AlertRow = ({ icon, title, copy, tone }) => (
     <div className={`dashboard-alert-row tone-${tone}`}>
-        <span><Icon size={18} /></span>
+        <span>{React.createElement(icon, { size: 18 })}</span>
         <div>
             <strong>{title}</strong>
             <p>{copy}</p>
@@ -653,9 +685,9 @@ const InsightList = ({ title, emptyText, items }) => (
     </div>
 );
 
-const SummaryCard = ({ icon: Icon, label, value, tone }) => (
+const SummaryCard = ({ icon, label, value, tone }) => (
     <article className={`dashboard-summary-card tone-${tone}`}>
-        <Icon size={26} />
+        {React.createElement(icon, { size: 26 })}
         <span>{label}</span>
         <strong>{value}</strong>
     </article>

@@ -21,6 +21,19 @@ const History = () => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [downloadingReport, setDownloadingReport] = useState(false);
 
+    const applySearch = () => {
+        setDebouncedSearch(search.trim());
+        setPage(0);
+    };
+
+    const clearFilters = () => {
+        setSearch("");
+        setDebouncedSearch("");
+        setStartDate("");
+        setEndDate("");
+        setPage(0);
+    };
+
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedSearch(search.trim());
@@ -211,8 +224,30 @@ const History = () => {
                             placeholder="Search invoice, party or customer..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    applySearch();
+                                }
+                            }}
                         />
                     </div>
+                    <button
+                        type="button"
+                        className="history-search-btn"
+                        onClick={applySearch}
+                        disabled={!search.trim()}
+                    >
+                        Search
+                    </button>
+                    <button
+                        type="button"
+                        className="history-clear-btn"
+                        onClick={clearFilters}
+                        disabled={!search && !startDate && !endDate}
+                    >
+                        Clear
+                    </button>
 
                     {/* Download Report Button */}
                     <button

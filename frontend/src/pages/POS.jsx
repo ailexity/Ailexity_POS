@@ -15,7 +15,7 @@ const POS = () => {
     const DESKTOP_BREAKPOINT = 1024;
     const [items, setItems] = useState([]);
     const [search, setSearch] = useState("");
-    const { selectedTable, selectTable, cartItems, addToCart, removeFromCart, updateQty, cartTotal, cartTax, grandTotal, clearCart, setUserTaxRate, tableCarts, multiDeviceSyncEnabled, setMultiDeviceSync, fetchTableCartFromBackend } = useCart();
+    const { selectedTable, selectTable, cartItems, addToCart, removeFromCart, updateQty, cartTotal, cartTax, clearCart, setUserTaxRate, tableCarts, multiDeviceSyncEnabled, setMultiDeviceSync, fetchTableCartFromBackend } = useCart();
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [activeCategory, setActiveCategory] = useState("All");
@@ -297,7 +297,6 @@ const POS = () => {
         const businessName = invoice.business_name || user?.business_name || 'Our Store';
 
         // Generate invoice URLs
-        const invoiceUrl = `${window.location.origin}/invoice/${invoice.id}`;
         const sharePreviewUrl = `${window.location.origin}/api/invoices/public/${invoice.id}/share`;
 
         // Load WhatsApp template from localStorage

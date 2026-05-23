@@ -25,7 +25,6 @@ const Settings = () => {
         email: '',
         full_name: '',
         business_address: '',
-        business_type: '',
         tax_id: '',
         store_email: '',
         store_phone: '',
@@ -70,7 +69,6 @@ const Settings = () => {
                 email: currentUser.email || '',
                 full_name: currentUser.full_name || '',
                 business_address: currentUser.business_address || '',
-                business_type: normalizeBusinessType(currentUser.business_type) || '',
                 tax_id: currentUser.tax_id || '',
                 store_email: currentUser.store_email || '',
                 store_phone: currentUser.store_phone || '',
@@ -182,7 +180,6 @@ const Settings = () => {
                 email: formData.email,
                 full_name: formData.full_name,
                 business_address: formData.business_address,
-                business_type: formData.business_type,
                 tax_id: formData.tax_id,
                 store_email: formData.store_email,
                 store_phone: formData.store_phone,
@@ -460,18 +457,6 @@ const Settings = () => {
                                             />
                                         </FormField>
 
-                                        <FormField label="Business Type" help="Choose Restaurant or Retailer">
-                                            <select
-                                                className="input"
-                                                value={formData.business_type}
-                                                onChange={e => setFormData({ ...formData, business_type: e.target.value })}
-                                                required
-                                            >
-                                                <option value="">Select Type</option>
-                                                <option value="restaurant">Restaurant</option>
-                                                <option value="retailer">Retailer</option>
-                                            </select>
-                                        </FormField>
                                     </FormGroup>
                                 </FormSection>
 

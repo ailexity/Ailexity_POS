@@ -8,6 +8,12 @@
     background: rgba(255, 255, 255, 0.95);
     border-bottom: 1px solid var(--border-light);
     box-shadow: var(--shadow-sm);
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+    margin: 0;
 }
 
 .settings-page .header-section .w-8.h-8 {

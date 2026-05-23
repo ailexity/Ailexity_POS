@@ -79,7 +79,7 @@ async def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/users/", response_model=schemas.UserResponse)
-def create_user(user: schemas.UserCreate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+def create_user(user: schemas.UserCreate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):
     db_user = database.users_collection.find_one({"username": user.username})
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -159,10 +159,7 @@ def update_me(user_update: schemas.UserUpdateProfile, db: Database = Depends(dat
     if user_update.business_address is not None:
         update_data["business_address"] = user_update.business_address
     if user_update.business_type is not None:
-        normalized_business_type = _normalize_business_type(user_update.business_type)
-        if user_update.business_type.strip() and normalized_business_type is None:
-            raise HTTPException(status_code=400, detail="business_type must be either restaurant or retailer")
-        update_data["business_type"] = normalized_business_type
+        raise HTTPException(status_code=403, detail="business_type can only be changed by sysadmin")
     if user_update.tax_id is not None:
         update_data["tax_id"] = user_update.tax_id
     if user_update.tax_rate is not None:

@@ -222,7 +222,8 @@ def read_invoices(
         query["$or"] = [
             {"invoice_number": search_regex},
             {"customer_name": search_regex},
-            {"customer_phone": search_regex}
+            {"customer_phone": search_regex},
+            {"table_name": search_regex}
         ]
 
     try:
@@ -242,6 +243,9 @@ def read_invoices(
         pass
 
     total_count = database.invoices_collection.count_documents(query)
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total_count)
+
     invoices = list(
         database.invoices_collection.find(query)
         .sort("created_at", -1)
