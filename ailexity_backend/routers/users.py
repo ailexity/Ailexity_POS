@@ -383,3 +383,142 @@ async def change_system_password(
     
     return {"message": "System password updated successfully"}
 
+
+# Feature Management Endpoints
+
+@router.get("/users/{user_id}/features")
+async def get_user_features(
+    user_id: str,
+    db: Database = Depends(database.get_db),
+    current_user: dict = Depends(auth.get_sysadmin_user)
+):
+    """Get features/permissions for a specific user - System Admin only"""
+    user = database.users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    features = user.get("features", {
+        "stock_management": True,
+        "ledger_management": True,
+        "parties_management": True,
+        "items_management": True,
+        "pos_billing": True,
+        "invoices": True,
+        "alerts": True,
+        "dashboard": True,
+        "admin_panel": True,
+        "kot_printing": True,
+        "order_management": True,
+        "payment_tracking": True,
+    })
+    
+    return {
+        "user_id": user_id,
+        "username": user.get("username"),
+        "features": features
+    }
+
+
+@router.put("/users/{user_id}/features")
+async def update_user_features(
+    user_id: str,
+    features_update: dict,
+    db: Database = Depends(database.get_db),
+    current_user: dict = Depends(auth.get_sysadmin_user)
+):
+    """Update features/permissions for a specific user - System Admin only"""
+    user = database.users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get current features to merge with updates
+    current_features = user.get("features", {})
+    updated_features = {**current_features, **features_update}
+    
+    # Update user document with new features
+    database.users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"features": updated_features}}
+    )
+    
+    return {
+        "status": "success",
+        "message": "User features updated successfully",
+        "user_id": user_id,
+        "features": updated_features
+    }
+
+
+@router.get("/admin/features-list")
+async def get_all_available_features(
+    current_user: dict = Depends(auth.get_sysadmin_user)
+):
+    """Get list of all available features that can be managed - System Admin only"""
+    available_features = {
+        "stock_management": {
+            "name": "Stock Management",
+            "description": "Manage inventory and stock levels",
+            "icon": "Package"
+        },
+        "ledger_management": {
+            "name": "Ledger Management",
+            "description": "Access party ledger and accounting",
+            "icon": "BookOpen"
+        },
+        "parties_management": {
+            "name": "Parties/Customers Management",
+            "description": "Manage customer and supplier information",
+            "icon": "Users"
+        },
+        "items_management": {
+            "name": "Items Management",
+            "description": "Create and manage product items",
+            "icon": "ShoppingCart"
+        },
+        "pos_billing": {
+            "name": "POS Billing",
+            "description": "Access to billing system",
+            "icon": "CreditCard"
+        },
+        "invoices": {
+            "name": "Invoices",
+            "description": "View and manage invoices",
+            "icon": "FileText"
+        },
+        "alerts": {
+            "name": "Alerts Management",
+            "description": "Configure and manage alerts",
+            "icon": "Bell"
+        },
+        "dashboard": {
+            "name": "Dashboard",
+            "description": "Access to analytics dashboard",
+            "icon": "BarChart3"
+        },
+        "admin_panel": {
+            "name": "Admin Settings",
+            "description": "Access to admin settings",
+            "icon": "Settings"
+        },
+        "kot_printing": {
+            "name": "KOT Printing",
+            "description": "Kitchen Order Ticket printing functionality",
+            "icon": "Printer"
+        },
+        "order_management": {
+            "name": "Order Management",
+            "description": "Manage and track orders",
+            "icon": "ClipboardList"
+        },
+        "payment_tracking": {
+            "name": "Payment Tracking",
+            "description": "Track payments and transactions",
+            "icon": "DollarSign"
+        }
+    }
+    
+    return {
+        "available_features": available_features,
+        "total_features": len(available_features)
+    }
+

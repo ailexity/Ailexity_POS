@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 import os
 from dotenv import load_dotenv
 import database
-from routers import users, items, invoices, ai_assistant, tables, alerts, table_carts, online_orders, raw_stock, parties
+from routers import users, items, invoices, ai_assistant, tables, alerts, table_carts, online_orders, raw_stock, parties, kots
 
 # Load environment variables from .env file
 load_dotenv()
@@ -81,6 +81,7 @@ app.include_router(table_carts.router)
 app.include_router(online_orders.router)
 app.include_router(raw_stock.router)
 app.include_router(parties.router)
+app.include_router(kots.router)
 
 @app.get("/")
 def read_root():

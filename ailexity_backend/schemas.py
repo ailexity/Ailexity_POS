@@ -430,3 +430,44 @@ class PartyDueAlertResponse(BaseModel):
     due_date: datetime
     days_overdue: int
 
+
+# --- Feature Management Schemas ---
+class UserFeatures(BaseModel):
+    """User feature permissions"""
+    stock_management: bool = True
+    ledger_management: bool = True
+    parties_management: bool = True
+    items_management: bool = True
+    pos_billing: bool = True
+    invoices: bool = True
+    alerts: bool = True
+    dashboard: bool = True
+    admin_panel: bool = True
+    kot_printing: bool = True
+    order_management: bool = True
+    payment_tracking: bool = True
+
+
+class FeaturesUpdateRequest(BaseModel):
+    """Request to update user features"""
+    features: dict
+
+
+class UserFeaturesResponse(BaseModel):
+    """Response for user features"""
+    user_id: str
+    username: str
+    features: UserFeatures
+
+
+class AvailableFeature(BaseModel):
+    """Available feature information"""
+    name: str
+    description: str
+    icon: str
+
+
+class AvailableFeaturesResponse(BaseModel):
+    """Response with all available features"""
+    available_features: dict
+    total_features: int

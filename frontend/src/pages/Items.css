@@ -466,29 +466,45 @@
         padding: 16px;
     }
 
-    /* Mobile Table - List View */
+    /* Mobile Table - Card Grid View */
     .items-table-container {
         border-radius: 8px;
+        background: transparent;
+        box-shadow: none;
+        border: none;
+    }
+
+    .items-table {
+        width: 100%;
+        border: none;
+        border-collapse: separate;
     }
 
     .items-table thead {
         display: none;
     }
 
+    .items-table tbody {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
     .items-table tbody tr {
         display: grid;
         grid-template-columns: 1fr;
-        gap: 8px;
-        padding: 14px 16px;
-        border-bottom: 1px solid #e5e7eb;
-    }
-
-    .items-table tbody tr:last-child {
-        border-bottom: none;
+        gap: 12px;
+        padding: 18px;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        background: #ffffff;
+        box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
     .items-table tbody tr:hover {
-        background: #f9fafb;
+        transform: translateY(-1px);
+        box-shadow: 0 14px 24px rgba(15, 23, 42, 0.08);
     }
 
     .items-table td {
@@ -507,6 +523,8 @@
         text-transform: uppercase;
         letter-spacing: 0.3px;
         flex-shrink: 0;
+        margin-bottom: 6px;
+        display: block;
     }
 
     .items-name-group {
@@ -515,7 +533,21 @@
     }
 
     .items-name {
-        font-size: 0.9rem;
+        font-size: 0.95rem;
+    }
+
+    .items-table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .items-empty-state {
+        padding: 48px 20px;
+    }
+
+    @media (max-width: 560px) {
+        .items-table tbody {
+            grid-template-columns: 1fr;
+        }
     }
 
     .items-category-text {

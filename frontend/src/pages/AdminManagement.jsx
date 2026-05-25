@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Users, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, AlertCircle, Search } from 'lucide-react';
+import { Users, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, AlertCircle, Search, Settings } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import PageLoader from '../components/PageLoader';
+import FeatureManagementModal from '../components/FeatureManagementModal';
 
 const normalizeBusinessType = (businessType) => {
     const value = String(businessType || '').toLowerCase();

@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { Search, Plus, Minus, Trash2, ShoppingCart, Grid, Package, Smartphone, FileText, Grid3x3 } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, Grid, Package, Smartphone, FileText, Grid3x3, Printer } from 'lucide-react';
+import KOTPrintDialog from '../components/KOTPrintDialog';
 import './POS.css';
 
 const normalizeBusinessType = (businessType) => {
@@ -28,6 +29,7 @@ const POS = () => {
     const [tables, setTables] = useState([]);
     const [showTableSelector, setShowTableSelector] = useState(false);
     const [showCart, setShowCart] = useState(false);
+    const [showKOTPrint, setShowKOTPrint] = useState(false);
     const [isDesktopView, setIsDesktopView] = useState(() => window.innerWidth >= DESKTOP_BREAKPOINT);
     const [cartMaxHeight, setCartMaxHeight] = useState(null);
     const cartPanelRef = useRef(null);
@@ -681,7 +683,31 @@ const POS = () => {
                     )}
 
                     {/* Complete Order Button */}
-                    <div className="cart-actions">
+                    <div className="cart-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <button
+                            type="button"
+                            className="btn w-full"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (cartItems?.length > 0) {
+                                    setShowKOTPrint(true);
+                                }
+                            }}
+                            disabled={!cartItems?.length}
+                            aria-label="Print Kitchen Order Ticket"
+                            style={{
+                                background: '#f59e0b',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px'
+                            }}
+                        >
+                            <Printer size={16} />
+                            PRINT TO KITCHEN
+                        </button>
+
                         <button
                             type="button"
                             className="btn w-full cart-complete-btn"
@@ -700,6 +726,19 @@ const POS = () => {
                 </>
                 )}
             </div>
+
+            {/* KOT Print Dialog */}
+            <KOTPrintDialog
+                isOpen={showKOTPrint}
+                order={{ items: cartItems }}
+                tableInfo={isRetailer ? null : selectedTable}
+                businessName={user?.business_name || 'Ailexity POS'}
+                onClose={() => setShowKOTPrint(false)}
+                onSuccess={() => {
+                    // Optional: Clear cart after successful KOT print
+                    // clearCart();
+                }}
+            />
         </div>
     );
 };
