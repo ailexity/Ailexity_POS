@@ -77,6 +77,7 @@ class UserLogin(BaseModel):
 class UserResponse(UserBase):
     id: str  # MongoDB ObjectId as string
     is_active: bool
+    is_verified: Optional[bool] = False
     subscription_status: str = "active"
     active_window_start: Optional[str] = None  # Login access start date
     active_window_end: Optional[str] = None  # Login access end date

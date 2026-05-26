@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Users, Activity, TrendingUp, DollarSign, ShoppingCart, Package, BarChart3, Shield, UserPlus, AlertCircle, Eye, EyeOff, Search, Settings, Lock, Save, Database, Globe, MessageCircle } from 'lucide-react';
+import { Users, Activity, TrendingUp, DollarSign, ShoppingCart, Package, BarChart3, Shield, UserPlus, AlertCircle, Eye, EyeOff, Search, Settings, Lock, Save, Database, Globe, MessageCircle, CheckCircle } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import PageLoader from '../components/PageLoader';
 
@@ -135,6 +135,16 @@ const SystemDashboard = () => {
         } catch (err) {
             console.error('Failed to delete attendee', err);
             setError(err.response?.data?.detail || 'Failed to delete attendee');
+        }
+    };
+
+    const handleVerifyUser = async (userId) => {
+        setError('');
+        try {
+            await api.post(`/users/${userId}/verify`);
+            fetchSystemStats();
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Failed to verify user');
         }
     };
 
@@ -451,14 +461,14 @@ const SystemDashboard = () => {
 
     if (loading) {
         return (
-            <div className="page-container with-mobile-header-offset">
+            <div className="page-container with-mobile-header-offset sysadmin-page">
                 <PageLoader message="Loading system statistics..." />
             </div>
         );
     }
 
     return (
-        <div className="page-container with-mobile-header-offset" style={{ background: '#f8fafc' }}>
+        <div className="page-container with-mobile-header-offset sysadmin-page" style={{ background: '#f8fafc' }}>
             <PageHeader
                 icon={BarChart3}
                 title="System Dashboard"
@@ -1254,6 +1264,7 @@ const SystemDashboard = () => {
                                     <th>Total Revenue</th>
                                     <th>Invoices</th>
                                     <th>Items</th>
+                                    <th>Verification</th>
                                     <th>Subscription</th>
                                 </tr>
                             </thead>
@@ -1296,6 +1307,26 @@ const SystemDashboard = () => {
                                                 {u.role === 'admin' ? u.totalItems : '-'}
                                             </td>
                                             <td>
+                                                {u.role === 'admin' ? (
+                                                    u.is_verified ? (
+                                                        <span className="badge bg-green-500">Verified</span>
+                                                    ) : (
+                                                        <button
+                                                            className="btn-icon success"
+                                                            title="Mark admin as verified"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                handleVerifyUser(u.id);
+                                                            }}
+                                                        >
+                                                            <CheckCircle size={16} />
+                                                        </button>
+                                                    )
+                                                ) : (
+                                                    <span className="text-xs text-muted">Not required</span>
+                                                )}
+                                            </td>
+                                            <td>
                                                 <span className={`badge ${u.subscription_status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}>
                                                     {u.subscription_status || 'Active'}
                                                 </span>
@@ -1303,7 +1334,7 @@ const SystemDashboard = () => {
                                         </tr>
                                         {expandedUser === u.id && (
                                             <tr>
-                                                <td colSpan="7" style={{ padding: 0, background: '#f9fafb' }}>
+                                                <td colSpan="8" style={{ padding: 0, background: '#f9fafb' }}>
                                                     <div style={{ padding: '24px', borderTop: '2px solid #e5e7eb' }}>
                                                         {/* Header with User Info */}
                                                         <div style={{ 

@@ -243,6 +243,23 @@ def update_user(user_id: str, user_update: schemas.UserCreate, db: Database = De
     updated_user = database.users_collection.find_one({"_id": ObjectId(user_id)})
     return serialize_doc(updated_user)
 
+
+@router.post("/users/{user_id}/verify", response_model=schemas.UserResponse)
+def verify_user_by_sysadmin(user_id: str, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):
+    """Allow sysadmin to approve an existing admin account for login."""
+    db_user = database.users_collection.find_one({"_id": ObjectId(user_id)})
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if db_user.get("role") != "admin":
+        raise HTTPException(status_code=400, detail="Only admin accounts require verification")
+
+    database.users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"is_verified": True}, "$unset": {"otp": "", "otp_expires": ""}}
+    )
+    updated_user = database.users_collection.find_one({"_id": ObjectId(user_id)})
+    return serialize_doc(updated_user)
+
 @router.delete("/users/{user_id}")
 def delete_user(user_id: str, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):
     """Delete user - System Admin only"""

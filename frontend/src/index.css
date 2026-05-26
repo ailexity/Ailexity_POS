@@ -4503,6 +4503,14 @@ p {
   background: #fee2e2;
 }
 
+.btn-icon.success {
+  color: var(--success-color);
+}
+
+.btn-icon.success:hover {
+  background: var(--success-light);
+}
+
 .text-success {
   color: var(--success-color);
 }
@@ -4803,6 +4811,15 @@ p {
   background-color: #10b981;
 }
 
+.bg-yellow-500 {
+  background-color: #f59e0b;
+}
+
+.mx-6 {
+  margin-left: 1.5rem;
+  margin-right: 1.5rem;
+}
+
 /* Button Variants */
 .btn-secondary {
   background: white;
@@ -5076,6 +5093,83 @@ p {
 
 .bg-gray-50-50 {
   background-color: rgba(249, 250, 251, 0.5);
+}
+
+/* Sysadmin page polish */
+.sysadmin-page {
+  padding-top: 0;
+}
+
+.sysadmin-page .header-section {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  width: 100%;
+  align-self: stretch;
+  z-index: 10;
+}
+
+.sysadmin-page .content-area {
+  padding-top: 1.5rem;
+}
+
+.sysadmin-modal-overlay {
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.sysadmin-password-modal {
+  max-width: 420px;
+  padding: 1.75rem;
+}
+
+.sysadmin-user-modal {
+  max-width: 720px;
+}
+
+.sysadmin-modal-hero {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.sysadmin-modal-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 1rem;
+  border-radius: 12px;
+  background: var(--accent-light);
+  color: var(--accent-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sysadmin-modal-icon.small {
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.verification-note {
+  margin: -0.25rem 0 1rem;
+  padding: 0.75rem;
+  background: var(--warning-light);
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-md);
+  color: #92400e;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+@media (max-width: 639px) {
+  .sysadmin-page .content-area {
+    padding-top: 1rem;
+  }
+
+  .sysadmin-password-modal {
+    padding: 1.25rem;
+  }
 }
 
 /* --- AI Assistant Gradient Utilities --- */

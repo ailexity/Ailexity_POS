@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Users, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, AlertCircle, Search, Settings } from 'lucide-react';
+import { Users, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, AlertCircle, Search, Settings, CheckCircle, X } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import PageLoader from '../components/PageLoader';
 import FeatureManagementModal from '../components/FeatureManagementModal';
@@ -183,6 +183,16 @@ const AdminManagement = () => {
         }
     };
 
+    const handleVerifyUser = async (userId) => {
+        setError('');
+        try {
+            await api.post(`/users/${userId}/verify`);
+            fetchUsers();
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Failed to verify user');
+        }
+    };
+
     // Helper function to determine access status based on active window dates
     const getAccessStatus = (user) => {
         const today = new Date();
@@ -244,21 +254,21 @@ const AdminManagement = () => {
 
     if (loading) {
         return (
-            <div className="page-container with-mobile-header-offset">
+            <div className="page-container with-mobile-header-offset sysadmin-page">
                 <PageLoader message="Loading administrators..." />
             </div>
         );
     }
 
     return (
-        <div className="page-container with-mobile-header-offset" style={{ background: '#f8fafc' }}>
+        <div className="page-container with-mobile-header-offset sysadmin-page" style={{ background: '#f8fafc' }}>
             {/* System Password Protection Modal */}
             {showPasswordPrompt && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
-                    <div className="card" style={{ width: '100%', maxWidth: '420px', padding: '2rem' }}>
-                        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                            <div className="w-16 h-16 bg-purple-100 flex items-center justify-center rounded-full mx-auto mb-4">
-                                <Shield size={32} className="text-purple-600" />
+                <div className="modal-overlay sysadmin-modal-overlay">
+                    <div className="modal-content sysadmin-password-modal">
+                        <div className="sysadmin-modal-hero">
+                            <div className="sysadmin-modal-icon">
+                                <Shield size={28} />
                             </div>
                             <h2 className="text-xl font-bold mb-2">Admin Controls Access</h2>
                             <p className="text-sm text-muted">Enter system password to continue</p>
@@ -302,8 +312,6 @@ const AdminManagement = () => {
                                 </button>
                             </div>
                         </form>
-
-                        <p className="text-xs text-muted mt-4 text-center">🔒 This area is protected by system password</p>
                     </div>
                 </div>
             )}
@@ -385,6 +393,7 @@ const AdminManagement = () => {
                                     <th>Role</th>
                                     <th>Subscription</th>
                                     <th>Features</th>
+                                    <th>Verification</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -429,6 +438,15 @@ const AdminManagement = () => {
                                             )}
                                         </td>
                                         <td>
+                                            {u.role === 'admin' ? (
+                                                <span className={`badge ${u.is_verified ? 'bg-green-500' : 'bg-yellow-500'}`}>
+                                                    {u.is_verified ? 'Verified' : 'Pending'}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-muted">Not required</span>
+                                            )}
+                                        </td>
+                                        <td>
                                             {(() => {
                                                 const accessStatus = getAccessStatus(u);
                                                 return (
@@ -444,6 +462,15 @@ const AdminManagement = () => {
                                         </td>
                                         <td>
                                             <div className="flex gap-2">
+                                                {u.role === 'admin' && !u.is_verified && (
+                                                    <button
+                                                        className="btn-icon success"
+                                                        onClick={() => handleVerifyUser(u.id)}
+                                                        title="Mark admin as verified"
+                                                    >
+                                                        <CheckCircle size={16} />
+                                                    </button>
+                                                )}
                                                 <button
                                                     className="btn-icon"
                                                     onClick={() => openEditModal(u)}
@@ -483,7 +510,7 @@ const AdminManagement = () => {
                                     );
                                 }).length === 0 && (
                                         <tr>
-                                            <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                                            <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                                                     <Search size={32} style={{ opacity: 0.3 }} />
                                                     <p>No users found matching "{searchQuery}"</p>
@@ -499,16 +526,29 @@ const AdminManagement = () => {
 
             {/* Add User Modal */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="card max-w-lg w-full">
-                        <h2 className="mb-4">Add New User</h2>
+                <div className="modal-overlay sysadmin-modal-overlay">
+                    <div className="modal-content sysadmin-user-modal">
+                        <div className="modal-header">
+                            <div className="flex items-center gap-3">
+                                <div className="sysadmin-modal-icon small">
+                                    <UserPlus size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold">Add New User</h2>
+                                    <p className="text-sm text-muted">Create admin access and business details</p>
+                                </div>
+                            </div>
+                            <button type="button" className="btn-icon" onClick={() => { setShowAddModal(false); setError(''); }}>
+                                <X size={18} />
+                            </button>
+                        </div>
                         {error && (
-                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded flex items-center gap-2">
+                            <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded flex items-center gap-2">
                                 <AlertCircle size={18} color="#dc2626" />
                                 <span className="text-sm text-red-600">{error}</span>
                             </div>
                         )}
-                        <form onSubmit={handleAddUser}>
+                        <form onSubmit={handleAddUser} className="modal-body">
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-2">Username</label>
                                 <input
@@ -664,6 +704,9 @@ const AdminManagement = () => {
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">Leave empty for unlimited access</p>
                             </div>
+                            <p className="verification-note">
+                                New admin accounts stay pending until you verify them from the user table.
+                            </p>
                             <div className="flex gap-2">
                                 <button type="submit" className="btn flex-1">Create User</button>
                                 <button type="button" className="btn-secondary flex-1" onClick={() => { setShowAddModal(false); setError(''); }}>Cancel</button>
