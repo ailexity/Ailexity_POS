@@ -13,6 +13,10 @@ export class KOTGenerator {
      * Request Bluetooth device selection
      */
     async requestBluetoothDevice() {
+        if (!navigator.bluetooth) {
+            throw new Error('Bluetooth API is not available in this browser');
+        }
+
         try {
             const device = await navigator.bluetooth.requestDevice({
                 filters: [
@@ -24,6 +28,9 @@ export class KOTGenerator {
             return device;
         } catch (error) {
             console.error('Bluetooth device request failed:', error);
+            if (error.name === 'NotFoundError' || error.message?.includes('No device chosen')) {
+                throw new Error('No Bluetooth printer selected. Please connect a printer and try again.');
+            }
             throw new Error('Failed to select Bluetooth device: ' + error.message);
         }
     }
@@ -32,6 +39,10 @@ export class KOTGenerator {
      * Connect to Bluetooth printer
      */
     async connectToPrinter(device) {
+        if (!device) {
+            throw new Error('No Bluetooth device provided to connect');
+        }
+
         try {
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService('serial');
@@ -48,17 +59,24 @@ export class KOTGenerator {
      * Check if a printer is already connected
      */
     async checkConnectedPrinter() {
-        if (this.connectedPrinter) {
+        if (this.connectedPrinter && this.connectedPrinter.gatt && this.connectedPrinter.gatt.connected) {
             return this.connectedPrinter;
+        }
+
+        if (!navigator.bluetooth) {
+            return null;
         }
 
         try {
             const devices = await navigator.bluetooth.getDevices();
-            if (devices.length > 0) {
-                return devices[0]; // Return first paired device
+            for (const device of devices) {
+                if (device.gatt && device.gatt.connected) {
+                    this.connectedPrinter = device;
+                    return device;
+                }
             }
         } catch (error) {
-            console.log('No paired Bluetooth devices found');
+            console.log('No paired or connected Bluetooth devices found', error);
         }
         return null;
     }
@@ -288,11 +306,26 @@ export class KOTGenerator {
             selectNewDevice = false
         } = options;
 
+        if (!navigator.bluetooth) {
+            throw new Error('Bluetooth is not supported by this browser.');
+        }
+
         try {
-            // Get or select printer
-            let printer = this.connectedPrinter;
-            if (!printer || selectNewDevice) {
+            // Reuse an already connected printer if present
+            let printer = null;
+            if (!selectNewDevice) {
+                printer = await this.checkConnectedPrinter();
+            }
+
+            if (!printer) {
                 printer = await this.requestBluetoothDevice();
+            }
+
+            if (!printer) {
+                throw new Error('Not connected to any Bluetooth printer. Please connect a printer first.');
+            }
+
+            if (!printer.gatt || !printer.gatt.connected) {
                 await this.connectToPrinter(printer);
             }
 
@@ -303,10 +336,13 @@ export class KOTGenerator {
             return {
                 success: true,
                 message: 'KOT sent to printer successfully',
-                printer: printer.name
+                printer: printer.name ?? 'Bluetooth Printer'
             };
         } catch (error) {
             console.error('Print to Bluetooth error:', error);
+            if (error.message && error.message.includes('No Bluetooth printer')) {
+                throw new Error('Not connected to any printer. Please connect your Bluetooth printer and try again.');
+            }
             throw error;
         }
     }

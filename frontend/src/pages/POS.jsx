@@ -615,14 +615,7 @@ const POS = () => {
                                     onChange={(e) => setCustomerPhone(e.target.value)}
                                     style={{ fontSize: '0.875rem', padding: '0.5rem 0.75rem' }}
                                 />
-                                <input
-                                    className="input"
-                                    type="text"
-                                    placeholder="Customer GSTIN (optional)"
-                                    value={customerGstin}
-                                    onChange={(e) => setCustomerGstin(e.target.value.toUpperCase())}
-                                    style={{ fontSize: '0.875rem', padding: '0.5rem 0.75rem' }}
-                                />
+                                {/* Customer GSTIN removed to simplify cart UI */}
                             </div>
                             {customerPhone && (
                                 <p className="text-xs text-muted mt-2" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>

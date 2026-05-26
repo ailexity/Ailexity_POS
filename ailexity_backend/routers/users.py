@@ -7,6 +7,9 @@ import schemas
 import database
 import auth
 from models import UserDocument, serialize_doc, serialize_docs
+from utils.email_sender import send_otp_email
+import random
+from datetime import datetime, timedelta
 
 # India Standard Time (IST) - GMT+5:30
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -33,13 +36,17 @@ async def login_for_access_token(
     remember_me: bool = Form(False),
     db: Database = Depends(database.get_db)
 ):
-    user = database.users_collection.find_one({"username": username})
+    # Allow login by username or email
+    user = database.users_collection.find_one({"$or": [{"username": username}, {"email": username}]})
     if not user or not auth.verify_password(password, user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    # If admin role, require email verification
+    if user.get("role") == "admin" and not user.get("is_verified"):
+        raise HTTPException(status_code=403, detail="Admin account not verified. Please verify the email OTP before logging in.")
     
     if user.get("subscription_status") == 'inactive':
         raise HTTPException(
@@ -78,6 +85,56 @@ async def login_for_access_token(
     access_token = auth.create_access_token(data={"sub": user["username"]}, expires_delta=expires_delta)
     return {"access_token": access_token, "token_type": "bearer"}
 
+
+@router.post("/token/google", response_model=schemas.Token, summary="Login via Google for registered users")
+async def google_login(data: schemas.GoogleLogin, db: Database = Depends(database.get_db)):
+    # NOTE: For production, verify the id_token with Google's tokeninfo endpoint or google-auth library.
+    user = database.users_collection.find_one({"$or": [{"email": data.email}, {"google_id": data.google_id}]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.get("role") == "admin" and not user.get("is_verified"):
+        raise HTTPException(status_code=403, detail="Admin account not verified via email OTP")
+
+    # Associate google_id if missing
+    if not user.get("google_id"):
+        database.users_collection.update_one({"_id": user["_id"]}, {"$set": {"google_id": data.google_id}})
+
+    expires_delta = timedelta(days=3650) if data.remember_me else timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(data={"sub": user["username"]}, expires_delta=expires_delta)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/users/send-otp")
+async def send_admin_otp(email: str = Form(...), db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):
+    # Only sysadmin can trigger OTP send for new admin users
+    user = database.users_collection.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Generate 6-digit OTP
+    otp = f"{random.randint(100000, 999999)}"
+    expires = datetime.utcnow() + timedelta(minutes=15)
+    database.users_collection.update_one({"_id": user["_id"]}, {"$set": {"otp": otp, "otp_expires": expires}})
+    sent = send_otp_email(email, otp)
+    return {"sent": sent}
+
+
+@router.post("/users/verify-otp")
+async def verify_otp(payload: schemas.OTPVerify, db: Database = Depends(database.get_db)):
+    # Find by username or email
+    user = database.users_collection.find_one({"$or": [{"username": payload.username_or_email}, {"email": payload.username_or_email}]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not user.get("otp"):
+        raise HTTPException(status_code=400, detail="No OTP requested for this user")
+    if user.get("otp_expires") is None:
+        raise HTTPException(status_code=400, detail="OTP expired or invalid")
+    # Compare
+    now = datetime.utcnow()
+    if str(user.get("otp")) != str(payload.otp) or user.get("otp_expires") < now:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+    database.users_collection.update_one({"_id": user["_id"]}, {"$set": {"is_verified": True}, "$unset": {"otp": "", "otp_expires": ""}})
+    return {"verified": True}
+
 @router.post("/users/", response_model=schemas.UserResponse)
 def create_user(user: schemas.UserCreate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):
     db_user = database.users_collection.find_one({"username": user.username})
@@ -112,10 +169,20 @@ def create_user(user: schemas.UserCreate, db: Database = Depends(database.get_db
         active_window_start=user.active_window_start,
         active_window_end=user.active_window_end,
         enable_multi_device_sync=user.enable_multi_device_sync if user.enable_multi_device_sync is not None else False,
-        enable_order_management=user.enable_order_management if user.enable_order_management is not None else False
+        enable_order_management=user.enable_order_management if user.enable_order_management is not None else False,
+        features=user.features
     )
     result = database.users_collection.insert_one(new_user)
     new_user["_id"] = result.inserted_id
+    # If creating an admin, generate OTP and send verification email
+    if new_user.get("role") == "admin" and new_user.get("email"):
+        otp = f"{random.randint(100000, 999999)}"
+        expires = datetime.utcnow() + timedelta(minutes=15)
+        database.users_collection.update_one({"_id": new_user["_id"]}, {"$set": {"otp": otp, "otp_expires": expires}})
+        try:
+            send_otp_email(new_user.get("email"), otp)
+        except Exception:
+            pass
     return serialize_doc(new_user)
 
 @router.get("/users/me", response_model=schemas.UserResponse)
@@ -231,6 +298,9 @@ def update_user(user_id: str, user_update: schemas.UserCreate, db: Database = De
         "enable_multi_device_sync": user_update.enable_multi_device_sync if user_update.enable_multi_device_sync is not None else False,
         "enable_order_management": user_update.enable_order_management if user_update.enable_order_management is not None else False
     }
+
+    if user_update.features is not None:
+        update_data["features"] = user_update.features
     
     if user_update.password:  # Only update password if provided
         update_data["hashed_password"] = auth.get_password_hash(user_update.password)
@@ -242,6 +312,43 @@ def update_user(user_id: str, user_update: schemas.UserCreate, db: Database = De
     
     updated_user = database.users_collection.find_one({"_id": ObjectId(user_id)})
     return serialize_doc(updated_user)
+
+
+@router.post("/attendees", response_model=schemas.AttendeeResponse)
+def create_attendee(attendee: schemas.AttendeeCreate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+    # Admin or sysadmin can create attendees (waiters)
+    existing = database.users_collection.find_one({"username": attendee.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    hashed_password = auth.get_password_hash(attendee.password)
+    new_user = UserDocument.create(
+        username=attendee.username,
+        hashed_password=hashed_password,
+        role='attendee',
+        full_name=attendee.full_name,
+        phone=attendee.phone,
+        email=attendee.email,
+    )
+    res = database.users_collection.insert_one(new_user)
+    new_user["_id"] = res.inserted_id
+    # Attendees are considered verified for immediate login
+    database.users_collection.update_one({"_id": new_user["_id"]}, {"$set": {"is_verified": True}})
+    return serialize_doc(database.users_collection.find_one({"_id": new_user["_id"]}))
+
+
+@router.get("/attendees", response_model=List[schemas.AttendeeResponse])
+def list_attendees(db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+    docs = list(database.users_collection.find({"role": "attendee"}))
+    return serialize_docs(docs)
+
+
+@router.delete("/attendees/{attendee_id}")
+def delete_attendee(attendee_id: str, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+    dbu = database.users_collection.find_one({"_id": ObjectId(attendee_id)})
+    if not dbu:
+        raise HTTPException(status_code=404, detail="Attendee not found")
+    database.users_collection.delete_one({"_id": ObjectId(attendee_id)})
+    return {"message": "Attendee removed"}
 
 @router.delete("/users/{user_id}")
 def delete_user(user_id: str, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):

@@ -80,6 +80,10 @@ class UserDocument:
         return {
             "username": username,
             "hashed_password": hashed_password,
+            "is_verified": False,
+            "google_id": None,
+            "otp": None,
+            "otp_expires": None,
             "role": role,
             "is_active": is_active,
             "business_name": business_name,

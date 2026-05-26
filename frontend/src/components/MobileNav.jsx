@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, ShoppingBag, Package, FileText, Settings, Shield, BarChart3, Bell, Boxes } from 'lucide-react';
+import { Home, ShoppingBag, Package, FileText, Settings, Shield, BarChart3, Bell, Boxes, Users, DollarSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const normalizeBusinessType = (businessType) => {
@@ -13,7 +13,6 @@ const MobileNav = () => {
     const { user } = useAuth();
     const isSysAdmin = user?.role === 'sysadmin';
     const businessType = normalizeBusinessType(user?.business_type);
-    const isRestaurant = !isSysAdmin && businessType === 'restaurant';
     const isRetailer = !isSysAdmin && businessType === 'retailer';
 
     if (!user) return null;
@@ -31,25 +30,21 @@ const MobileNav = () => {
                     <NavLink to="/history" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="History" title={isRetailer ? 'Invoices' : 'History'}>
                         <FileText size={20} />
                     </NavLink>
-
-                    {isRestaurant && (
-                        <NavLink to="/items" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Inventory" title="Inventory">
-                            <Package size={20} />
-                        </NavLink>
-                    )}
-
-                    {isRetailer && (
-                        <NavLink to="/stock" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Stock" title="Stock">
-                            <Boxes size={20} />
-                        </NavLink>
-                    )}
-
-                    {isRestaurant && user?.enable_order_management && (
-                        <NavLink to="/orders" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Online Orders" title="Online Orders">
-                            <Package size={20} />
-                        </NavLink>
-                    )}
-
+                    <NavLink to="/items" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Inventory" title="Inventory">
+                        <Package size={20} />
+                    </NavLink>
+                    <NavLink to="/stock" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Stock" title="Stock">
+                        <Boxes size={20} />
+                    </NavLink>
+                    <NavLink to="/orders" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Online Orders" title="Online Orders">
+                        <Package size={20} />
+                    </NavLink>
+                    <NavLink to="/parties" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Parties" title="Parties">
+                        <Users size={20} />
+                    </NavLink>
+                    <NavLink to="/ledger" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Ledger" title="Ledger">
+                        <DollarSign size={20} />
+                    </NavLink>
                     <NavLink to="/settings" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`} aria-label="Settings" title="Settings">
                         <Settings size={20} />
                     </NavLink>

@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Users, Activity, TrendingUp, DollarSign, ShoppingCart, Package, BarChart3, Shield, UserPlus, AlertCircle, Eye, EyeOff, Search, Settings, Lock, Save, Database, Globe, MessageCircle } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 import PageLoader from '../components/PageLoader';
 
 const normalizeBusinessType = (businessType) => {
@@ -90,12 +91,52 @@ const SystemDashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    // Security: Redirect if not sysadmin
+    // Security: Redirect if not admin or sysadmin
     useEffect(() => {
-        if (user && user.role !== 'sysadmin') {
+        if (user && !['sysadmin', 'admin'].includes(user.role)) {
             navigate('/');
         }
     }, [user, navigate]);
+
+    // Attendees (waiters) management state
+    const [attendees, setAttendees] = useState([]);
+    const [attendeeForm, setAttendeeForm] = useState({ username: '', password: '', full_name: '', phone: '', email: '' });
+    const [attendeesLoading, setAttendeesLoading] = useState(false);
+
+    const fetchAttendees = async () => {
+        setAttendeesLoading(true);
+        try {
+            const res = await api.get('/attendees');
+            setAttendees(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+            console.error('Failed to load attendees', err);
+        } finally {
+            setAttendeesLoading(false);
+        }
+    };
+
+    const handleCreateAttendee = async (e) => {
+        e.preventDefault();
+        try {
+            await api.post('/attendees', attendeeForm);
+            setAttendeeForm({ username: '', password: '', full_name: '', phone: '', email: '' });
+            fetchAttendees();
+        } catch (err) {
+            console.error('Failed to create attendee', err);
+            setError(err.response?.data?.detail || 'Failed to create attendee');
+        }
+    };
+
+    const handleDeleteAttendee = async (id) => {
+        if (!confirm('Remove this attendee?')) return;
+        try {
+            await api.delete(`/attendees/${id}`);
+            fetchAttendees();
+        } catch (err) {
+            console.error('Failed to delete attendee', err);
+            setError(err.response?.data?.detail || 'Failed to delete attendee');
+        }
+    };
 
     useEffect(() => {
         fetchSystemStats();
@@ -417,43 +458,34 @@ const SystemDashboard = () => {
     }
 
     return (
-        <div className="page-container with-mobile-header-offset">
-            {/* Header */}
-            <div className="header-section">
-                <div className="flex items-center gap-3">
-                    <div style={{ width: '40px', height: '40px', background: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <BarChart3 size={24} color="white" />
-                    </div>
-                    <div>
-                        <h1>System Dashboard</h1>
-                        <p className="text-muted text-sm">Overview of all system activities and users</p>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <button 
-                        className="btn" 
-                        style={{ 
-                            background: activeView === 'settings' ? '#6366f1' : 'white',
-                            color: activeView === 'settings' ? 'white' : '#6366f1',
-                            border: '1px solid #6366f1'
-                        }}
-                        onClick={() => {
-                            setShowPasswordPrompt(true);
-                            setPasswordError('');
-                            setSystemPassword('');
-                        }}
-                    >
-                        <Settings size={18} />
-                        System Settings
+        <div className="page-container with-mobile-header-offset" style={{ background: '#f8fafc' }}>
+            <PageHeader
+                icon={BarChart3}
+                title="System Dashboard"
+                subtitle="Overview of system activity and configuration"
+            >
+                <button
+                    className="btn"
+                    onClick={() => {
+                        setShowPasswordPrompt(true);
+                        setPasswordError('');
+                        setSystemPassword('');
+                    }}
+                >
+                    <Settings size={18} />
+                    System Settings
+                </button>
+                <button className="btn" onClick={() => { setActiveView('attendees'); setError(''); fetchAttendees(); }}>
+                    <Users size={18} />
+                    Attendees
+                </button>
+                {activeView === 'overview' && (
+                    <button className="btn" onClick={() => { setShowAddModal(true); setError(''); }}>
+                        <UserPlus size={18} />
+                        Add New User
                     </button>
-                    {activeView === 'overview' && (
-                        <button className="btn" onClick={() => { setShowAddModal(true); setError(''); }}>
-                            <UserPlus size={18} />
-                            Add New User
-                        </button>
-                    )}
-                </div>
-            </div>
+                )}
+            </PageHeader>
 
             {/* Content Area */}
             <div className="content-area">
@@ -1641,9 +1673,9 @@ const SystemDashboard = () => {
 
             {/* System Settings Password Prompt */}
             {showPasswordPrompt && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-                    <div className="card" style={{ maxWidth: '400px', width: '100%' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+                    <div className="card" style={{ maxWidth: '420px', width: '100%', padding: '2rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem' }}>
                             <div style={{ width: '40px', height: '40px', background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Lock size={20} color="#f59e0b" />
                             </div>
@@ -1654,18 +1686,18 @@ const SystemDashboard = () => {
                         </div>
 
                         {passwordError && (
-                            <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 border border-red-200">
-                                {passwordError}
+                            <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <AlertCircle size={18} />
+                                <span>{passwordError}</span>
                             </div>
                         )}
 
                         <form onSubmit={handlePasswordSubmit}>
-                            <div style={{ marginBottom: '20px' }}>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#64748b', marginBottom: '8px' }}>Password</label>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium mb-2">Password</label>
                                 <input
                                     type="password"
                                     className="input"
-                                    style={{ width: '100%' }}
                                     value={systemPassword}
                                     onChange={e => setSystemPassword(e.target.value)}
                                     placeholder="Enter system password"
@@ -1673,7 +1705,13 @@ const SystemDashboard = () => {
                                 />
                             </div>
 
-                            <div style={{ display: 'flex', gap: '12px' }}>
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary w-full"
+                                >
+                                    Access Admin Settings
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -1681,29 +1719,14 @@ const SystemDashboard = () => {
                                         setPasswordError('');
                                         setSystemPassword('');
                                     }}
-                                    style={{
-                                        flex: 1,
-                                        padding: '10px 24px',
-                                        border: '1px solid #e2e8f0',
-                                        borderRadius: '6px',
-                                        fontSize: '14px',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                        backgroundColor: 'white',
-                                        color: '#64748b'
-                                    }}
+                                    className="btn btn-secondary w-full"
                                 >
                                     Cancel
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="btn"
-                                    style={{ flex: 1 }}
-                                >
-                                    Access
-                                </button>
                             </div>
                         </form>
+
+                        <p className="text-xs text-muted mt-4 text-center">🔒 This section is protected by system password</p>
                     </div>
                 </div>
             )}

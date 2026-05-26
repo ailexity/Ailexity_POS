@@ -21,6 +21,8 @@ const AdminManagement = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [featureUser, setFeatureUser] = useState(null);
+    const [showFeatureModal, setShowFeatureModal] = useState(false);
     const [formData, setFormData] = useState({
         username: '',
         password: '',
@@ -229,6 +231,17 @@ const AdminManagement = () => {
         setError('');
     };
 
+    const openFeatureModal = (user) => {
+        setFeatureUser(user);
+        setShowFeatureModal(true);
+        setError('');
+    };
+
+    const closeFeatureModal = () => {
+        setShowFeatureModal(false);
+        setFeatureUser(null);
+    };
+
     if (loading) {
         return (
             <div className="page-container with-mobile-header-offset">
@@ -238,27 +251,12 @@ const AdminManagement = () => {
     }
 
     return (
-        <div className="page-container with-mobile-header-offset">
+        <div className="page-container with-mobile-header-offset" style={{ background: '#f8fafc' }}>
             {/* System Password Protection Modal */}
             {showPasswordPrompt && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 9999
-                }}>
-                    <div className="card" style={{ 
-                        width: '90%', 
-                        maxWidth: '400px',
-                        padding: '2rem'
-                    }}>
-                        <div className="text-center mb-6">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+                    <div className="card" style={{ width: '100%', maxWidth: '420px', padding: '2rem' }}>
+                        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                             <div className="w-16 h-16 bg-purple-100 flex items-center justify-center rounded-full mx-auto mb-4">
                                 <Shield size={32} className="text-purple-600" />
                             </div>
@@ -266,12 +264,19 @@ const AdminManagement = () => {
                             <p className="text-sm text-muted">Enter system password to continue</p>
                         </div>
 
+                        {passwordError && (
+                            <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <AlertCircle size={18} />
+                                <span>{passwordError}</span>
+                            </div>
+                        )}
+
                         <form onSubmit={handleSystemPasswordSubmit}>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-2">System Password</label>
                                 <input
                                     type="password"
-                                    className="input-field"
+                                    className="input"
                                     value={systemPassword}
                                     onChange={(e) => setSystemPassword(e.target.value)}
                                     placeholder="Enter system password"
@@ -280,29 +285,25 @@ const AdminManagement = () => {
                                 />
                             </div>
 
-                            {passwordError && (
-                                <div className="p-3 mb-4 bg-red-50 text-red-700 rounded text-sm flex items-center gap-2">
-                                    <AlertCircle size={16} />
-                                    {passwordError}
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                className="btn btn-primary w-full"
-                                disabled={isVerifying}
-                            >
-                                {isVerifying ? 'Verifying...' : 'Access Admin Controls'}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => navigate('/')}
-                                className="btn btn-secondary w-full mt-2"
-                            >
-                                Cancel
-                            </button>
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary w-full"
+                                    disabled={isVerifying}
+                                >
+                                    {isVerifying ? 'Verifying...' : 'Access Admin Controls'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/')}
+                                    className="btn btn-secondary w-full"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
                         </form>
+
+                        <p className="text-xs text-muted mt-4 text-center">🔒 This area is protected by system password</p>
                     </div>
                 </div>
             )}
@@ -378,11 +379,12 @@ const AdminManagement = () => {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
+                                            <th>ID</th>
                                     <th>Username</th>
                                     <th>Business Name</th>
                                     <th>Role</th>
                                     <th>Subscription</th>
+                                    <th>Features</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -418,6 +420,15 @@ const AdminManagement = () => {
                                             </span>
                                         </td>
                                         <td>
+                                            {u.features ? (
+                                                <span className="badge bg-slate-500 text-white">
+                                                    {Object.values(u.features).filter(Boolean).length}/{Object.keys(u.features).length}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-muted">No features</span>
+                                            )}
+                                        </td>
+                                        <td>
                                             {(() => {
                                                 const accessStatus = getAccessStatus(u);
                                                 return (
@@ -439,6 +450,13 @@ const AdminManagement = () => {
                                                     title="Edit User"
                                                 >
                                                     <Edit size={16} />
+                                                </button>
+                                                <button
+                                                    className="btn-icon"
+                                                    onClick={() => openFeatureModal(u)}
+                                                    title="Manage Features"
+                                                >
+                                                    <Settings size={16} />
                                                 </button>
                                                 {u.id !== user?.id && (
                                                     <button
@@ -465,7 +483,7 @@ const AdminManagement = () => {
                                     );
                                 }).length === 0 && (
                                         <tr>
-                                            <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                                            <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                                                     <Search size={32} style={{ opacity: 0.3 }} />
                                                     <p>No users found matching "{searchQuery}"</p>
@@ -916,6 +934,14 @@ const AdminManagement = () => {
                     </div>
                 </div>
             )}
+
+            <FeatureManagementModal
+                isOpen={showFeatureModal}
+                userId={featureUser?.id}
+                userName={featureUser?.username}
+                onClose={closeFeatureModal}
+                onSave={fetchUsers}
+            />
         </div>
     );
 };

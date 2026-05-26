@@ -10,6 +10,7 @@ const Login = () => {
     const [rememberMe, setRememberMe] = useState(true);
     const [showPassword, setShowPassword] = useState(false);
     const { login } = useAuth();
+    const { googleLogin } = useAuth();
     const navigate = useNavigate();
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -27,6 +28,27 @@ const Login = () => {
         const storedRememberMe = localStorage.getItem('remember_me');
         if (storedRememberMe === 'false') {
             setRememberMe(false);
+        }
+        // Load Google Identity Services if client id provided
+        const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+        if (clientId && window && !window.google) {
+            const script = document.createElement('script');
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            script.defer = true;
+            script.onload = () => {
+                window.google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: async (response) => {
+                        // response.credential is the ID token
+                        const result = await googleLogin(response.credential, rememberMe);
+                        if (result.success) navigate('/app');
+                        else setError(result.error || 'Google login failed');
+                    }
+                });
+                window.google.accounts.id.renderButton(document.getElementById('google-signin-button'), { theme: 'outline', size: 'large' });
+            };
+            document.head.appendChild(script);
         }
     }, []);
 
@@ -136,13 +158,7 @@ const Login = () => {
                             {loading ? 'Signing in...' : 'Sign In'}
                         </button>
 
-                        <button
-                            type="button"
-                            className="login-secondary-btn"
-                            onClick={() => setShowRequestModal(true)}
-                        >
-                            Request Access
-                        </button>
+                        <div id="google-signin-button" style={{ marginTop: 12 }} />
                     </form>
 
                     <p className="login-footer-text">

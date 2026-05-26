@@ -501,7 +501,8 @@ p {
   flex-direction: column;
   gap: 4px;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .sidebar .nav-brand {

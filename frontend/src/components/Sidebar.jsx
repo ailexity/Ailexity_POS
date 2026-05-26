@@ -13,7 +13,6 @@ const Sidebar = () => {
     const { logout, user } = useAuth();
     const isSysAdmin = user?.role === 'sysadmin';
     const businessType = normalizeBusinessType(user?.business_type);
-    const isRestaurant = !isSysAdmin && businessType === 'restaurant';
     const isRetailer = !isSysAdmin && businessType === 'retailer';
 
     return (
@@ -55,39 +54,33 @@ const Sidebar = () => {
                             </NavLink>
                         </div>
 
-                        {isRestaurant && (
-                            <div className="sidebar-group">
-                                <div className="sidebar-group-title">Restaurant features</div>
-                                <NavLink to="/items" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                    <Package size={20} />
-                                    <span>Inventory</span>
-                                </NavLink>
-                                {user?.enable_order_management && (
-                                    <NavLink to="/orders" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                        <Box size={20} />
-                                        <span>Online Orders</span>
-                                    </NavLink>
-                                )}
-                            </div>
-                        )}
+                        <div className="sidebar-group">
+                            <div className="sidebar-group-title">Restaurant features</div>
+                            <NavLink to="/items" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                <Package size={20} />
+                                <span>Inventory</span>
+                            </NavLink>
+                            <NavLink to="/orders" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                <Box size={20} />
+                                <span>Online Orders</span>
+                            </NavLink>
+                        </div>
 
-                        {isRetailer && (
-                            <div className="sidebar-group">
-                                <div className="sidebar-group-title">Retailer features</div>
-                                <NavLink to="/stock" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                    <Boxes size={20} />
-                                    <span>Stock</span>
-                                </NavLink>
-                                <NavLink to="/parties" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                    <Users size={20} />
-                                    <span>Parties</span>
-                                </NavLink>
-                                <NavLink to="/ledger" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                    <DollarSign size={20} />
-                                    <span>Ledger</span>
-                                </NavLink>
-                            </div>
-                        )}
+                        <div className="sidebar-group">
+                            <div className="sidebar-group-title">Retailer features</div>
+                            <NavLink to="/stock" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                <Boxes size={20} />
+                                <span>Stock</span>
+                            </NavLink>
+                            <NavLink to="/parties" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                <Users size={20} />
+                                <span>Parties</span>
+                            </NavLink>
+                            <NavLink to="/ledger" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                                <DollarSign size={20} />
+                                <span>Ledger</span>
+                            </NavLink>
+                        </div>
                     </>
                 )}
 
@@ -118,12 +111,10 @@ const Sidebar = () => {
                     </div>
                 </div>
 
-                {!isSysAdmin && (
-                    <NavLink to="/settings" className="nav-item">
-                        <Settings size={20} />
-                        <span>Settings</span>
-                    </NavLink>
-                )}
+                <NavLink to="/settings" className="nav-item">
+                    <Settings size={20} />
+                    <span>Settings</span>
+                </NavLink>
 
                 <button onClick={logout} className="nav-item w-full text-left" style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}>
                     <LogOut size={20} />
