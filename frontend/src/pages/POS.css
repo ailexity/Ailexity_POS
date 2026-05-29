@@ -546,7 +546,8 @@
 
 /* Cart Panel */
 .pos-cart-panel {
-    width: 100%;
+    box-sizing: border-box;
+    width: min(100%, 380px);
     max-width: 380px;
     background: #ffffff;
     border-left: 1px solid rgba(226, 232, 240, 0.9);
@@ -556,6 +557,25 @@
     transition: all 0.3s ease;
     overflow: hidden;
     min-width: 300px;
+}
+
+@media (min-width: 1024px) {
+    .pos-container {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+        grid-template-rows: auto 1fr;
+        grid-template-areas:
+            "header cart"
+            "left cart";
+        gap: 0;
+    }
+
+    .pos-cart-panel {
+        grid-area: cart;
+        width: 100%;
+        max-width: 380px;
+        min-width: 300px;
+    }
 }
 
 .pos-cart-panel.is-collapsed {

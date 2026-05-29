@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
+from pydantic import BaseModel
 from pymongo.database import Database
 from bson import ObjectId
 import database
@@ -14,6 +15,10 @@ router = APIRouter(
     prefix="/kots",
     tags=["kitchen-order-tickets"],
 )
+
+
+class KOTStatusPayload(BaseModel):
+    status: str
 
 
 @router.post("/", response_model=dict, status_code=status.HTTP_201_CREATED)
@@ -30,13 +35,15 @@ async def create_kot(
         if not payload.get("items") or not isinstance(payload.get("items"), list):
             raise HTTPException(status_code=400, detail="Items list is required")
 
+        admin_id = current_user.get("admin_id") or current_user["id"]
+
         # Create KOT document
         kot_doc = {
-            "admin_id": current_user["id"],
+            "admin_id": admin_id,
             "table_number": payload.get("table_number"),
             "table_name": payload.get("table_name"),
             "items": payload.get("items", []),
-            "status": "pending",  # pending, printed, completed, cancelled
+            "status": "pending",  # pending, preparing, ready, completed, cancelled
             "printed_at": None,
             "completed_at": None,
             "created_at": datetime.now(IST),
@@ -72,11 +79,12 @@ async def mark_kot_printed(
     """
     try:
         # Update KOT status to printed
+        query = {"_id": ObjectId(kot_id)}
+        if current_user.get("role") != "sysadmin":
+            query["admin_id"] = current_user.get("admin_id") or current_user["id"]
+
         result = db.kots.update_one(
-            {
-                "_id": ObjectId(kot_id),
-                "admin_id": current_user["id"]
-            },
+            query,
             {
                 "$set": {
                     "status": "printed",
@@ -100,6 +108,38 @@ async def mark_kot_printed(
         raise HTTPException(status_code=500, detail=f"Error updating KOT: {str(e)}")
 
 
+@router.get("/", response_model=List[dict])
+async def list_kots(
+    status: Optional[str] = None,
+    table_number: Optional[int] = None,
+    current_user: dict = Depends(get_current_active_user),
+    db: Database = Depends(database.get_db),
+) -> List[dict]:
+    """
+    List KOTs, optionally filtered by status or table number.
+    """
+    try:
+        query = {}
+        if current_user.get("role") != "sysadmin":
+            query["admin_id"] = current_user.get("admin_id") or current_user["id"]
+
+        if status:
+            query["status"] = status
+
+        if table_number is not None:
+            query["table_number"] = table_number
+
+        kots = list(db.kots.find(query).sort("created_at", -1).limit(200))
+
+        for kot in kots:
+            kot["id"] = str(kot["_id"])
+
+        return kots
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching KOTs: {str(e)}")
+
+
 @router.get("/pending", response_model=List[dict])
 async def get_pending_kots(
     table_number: Optional[int] = None,
@@ -111,9 +151,10 @@ async def get_pending_kots(
     """
     try:
         query = {
-            "admin_id": current_user["id"],
             "status": {"$in": ["pending", "printed"]}
         }
+        if current_user.get("role") != "sysadmin":
+            query["admin_id"] = current_user.get("admin_id") or current_user["id"]
 
         if table_number is not None:
             query["table_number"] = table_number
@@ -129,6 +170,52 @@ async def get_pending_kots(
         raise HTTPException(status_code=500, detail=f"Error fetching KOTs: {str(e)}")
 
 
+@router.put("/{kot_id}/status", response_model=dict)
+async def update_kot_status(
+    kot_id: str,
+    payload: KOTStatusPayload,
+    current_user: dict = Depends(get_current_active_user),
+    db: Database = Depends(database.get_db),
+) -> dict:
+    """
+    Update KOT status to pending/preparing/ready/completed/cancelled
+    """
+    try:
+        valid_statuses = ["pending", "preparing", "ready", "printed", "completed", "cancelled"]
+        requested_status = payload.status.lower()
+        if requested_status not in valid_statuses:
+            raise HTTPException(status_code=400, detail="Invalid KOT status")
+
+        query = {
+            "_id": ObjectId(kot_id)
+        }
+        if current_user.get("role") != "sysadmin":
+            query["admin_id"] = current_user.get("admin_id") or current_user["id"]
+
+        update_data = {
+            "status": requested_status,
+            "updated_at": datetime.now(IST),
+        }
+        if requested_status == "printed":
+            update_data["printed_at"] = datetime.now(IST)
+        if requested_status == "completed":
+            update_data["completed_at"] = datetime.now(IST)
+
+        result = db.kots.update_one(query, {"$set": update_data})
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="KOT not found")
+
+        return {
+            "status": "success",
+            "message": f"KOT marked as {requested_status}"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating KOT: {str(e)}")
+
+
 @router.put("/{kot_id}/completed", response_model=dict)
 async def mark_kot_completed(
     kot_id: str,
@@ -139,11 +226,12 @@ async def mark_kot_completed(
     Mark a KOT as completed
     """
     try:
+        query = {"_id": ObjectId(kot_id)}
+        if current_user.get("role") != "sysadmin":
+            query["admin_id"] = current_user.get("admin_id") or current_user["id"]
+
         result = db.kots.update_one(
-            {
-                "_id": ObjectId(kot_id),
-                "admin_id": current_user["id"]
-            },
+            query,
             {
                 "$set": {
                     "status": "completed",

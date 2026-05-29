@@ -29,8 +29,25 @@ const AttendeesManagement = () => {
     fetchAttendees();
   }, []);
 
+  const isDuplicateUsername = (username) => {
+    const normalized = username.trim().toLowerCase();
+    return attendees.some((attendee) => attendee.username?.toLowerCase() === normalized);
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
+    const username = formData.username.trim();
+
+    if (!username) {
+      setMessage({ type: 'error', text: 'Username cannot be empty.' });
+      return;
+    }
+
+    if (isDuplicateUsername(username)) {
+      setMessage({ type: 'error', text: 'That username is already in use. Please choose a different one.' });
+      return;
+    }
+
     setSaving(true);
     setMessage({ type: '', text: '' });
 

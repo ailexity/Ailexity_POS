@@ -45,6 +45,14 @@ const POS = () => {
         is_virtual: true,
     }), []);
 
+    const attendeeBillingTable = useMemo(() => ({
+        id: 'attendee-billing',
+        table_number: null,
+        table_name: 'Attendee Billing',
+        capacity: 1,
+        is_virtual: true,
+    }), []);
+
     useEffect(() => {
         const handleResize = () => {
             setIsDesktopView(window.innerWidth >= DESKTOP_BREAKPOINT);
@@ -160,10 +168,18 @@ const POS = () => {
             return;
         }
 
+        if (isAttendee) {
+            if (!selectedTable) {
+                selectTable(attendeeBillingTable);
+            }
+            setShowTableSelector(false);
+            return;
+        }
+
         if (selectedTable?.is_virtual) {
             selectTable(null);
         }
-    }, [isRetailer, selectedTable, selectTable, retailBillingTable]);
+    }, [isRetailer, isAttendee, selectedTable, selectTable, retailBillingTable, attendeeBillingTable]);
 
     useEffect(() => {
         if (!cartPanelRef.current) return;

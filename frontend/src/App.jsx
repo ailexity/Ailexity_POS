@@ -18,6 +18,7 @@ import AdminManagement from './pages/AdminManagement';
 import AlertsManagement from './pages/AlertsManagement';
 import Settings from './pages/Settings';
 import OrderManagement from './pages/OrderManagement';
+import KOTManagement from './pages/KOTManagement';
 import InvoiceView from './pages/InvoiceView';
 import StockManagement from './pages/StockManagement';
 import PartyManagement from './pages/PartyManagement';
@@ -223,6 +224,7 @@ function App() {
               <Route path="/items" element={<BusinessTypeRoute allow={['restaurant']} feature="items_management"><Items /></BusinessTypeRoute>} />
               <Route path="/history" element={<BusinessTypeRoute allow={['restaurant', 'retailer']} feature="invoices"><History /></BusinessTypeRoute>} />
               <Route path="/orders" element={<BusinessTypeRoute allow={['restaurant']} feature="order_management"><OrderManagement /></BusinessTypeRoute>} />
+              <Route path="/kots" element={<BusinessTypeRoute allow={['restaurant']} feature="kot_printing"><KOTManagement /></BusinessTypeRoute>} />
               <Route path="/stock" element={<BusinessTypeRoute allow={['retailer']} feature="stock_management"><StockManagement /></BusinessTypeRoute>} />
               <Route path="/parties" element={<BusinessTypeRoute allow={['retailer']} feature="parties_management"><PartyManagement /></BusinessTypeRoute>} />
               <Route path="/ledger" element={<BusinessTypeRoute allow={['retailer']} feature="ledger_management"><LedgerManagement /></BusinessTypeRoute>} />

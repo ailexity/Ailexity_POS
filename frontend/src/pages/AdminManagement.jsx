@@ -39,6 +39,22 @@ const AdminManagement = () => {
         active_window_start: '',
         active_window_end: ''
     });
+
+    const getKitchenUserFeatures = () => ({
+        stock_management: false,
+        ledger_management: false,
+        parties_management: false,
+        items_management: false,
+        pos_billing: false,
+        invoices: false,
+        alerts: false,
+        dashboard: false,
+        admin_panel: false,
+        kot_printing: true,
+        order_management: true,
+        payment_tracking: false,
+        attendees_management: false,
+    });
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     
@@ -107,6 +123,11 @@ const AdminManagement = () => {
                 ...formData,
                 business_type: normalizedBusinessType || formData.business_type,
             };
+
+            if (formData.role === 'kitchen') {
+                payload.business_type = payload.business_type || 'restaurant';
+                payload.features = getKitchenUserFeatures();
+            }
 
             await api.post('/users/', payload);
             setShowAddModal(false);
