@@ -22,7 +22,7 @@ const FeatureManagementModal = ({ isOpen, userId, userName, onClose, onSave }) =
         setError('');
         try {
             const response = await api.get(`/users/${userId}/features`);
-            setFeatures(response.data.features || {});
+            setFeatures(mergeFeatureSettings(response.data.features || {}, allFeatures));
         } catch (err) {
             setError(err.response?.data?.detail || 'Failed to load user features');
         } finally {
@@ -33,10 +33,23 @@ const FeatureManagementModal = ({ isOpen, userId, userName, onClose, onSave }) =
     const fetchAvailableFeatures = async () => {
         try {
             const response = await api.get('/admin/features-list');
-            setAllFeatures(response.data.available_features || {});
+            const available = response.data.available_features || {};
+            setAllFeatures(available);
+            setFeatures(prev => mergeFeatureSettings(prev, available));
         } catch (err) {
             console.error('Failed to load available features:', err);
         }
+    };
+
+    const mergeFeatureSettings = (userFeatures = {}, availableFeatures = {}) => {
+        const merged = {};
+        Object.keys(availableFeatures).forEach((key) => {
+            merged[key] = userFeatures[key] ?? false;
+        });
+        Object.keys(userFeatures).forEach((key) => {
+            if (!(key in merged)) merged[key] = userFeatures[key];
+        });
+        return merged;
     };
 
     const handleToggleFeature = (featureKey) => {
@@ -66,7 +79,7 @@ const FeatureManagementModal = ({ isOpen, userId, userName, onClose, onSave }) =
     };
 
     const handleEnableAll = () => {
-        const allEnabled = Object.keys(features).reduce((acc, key) => {
+        const allEnabled = Object.keys(allFeatures).reduce((acc, key) => {
             acc[key] = true;
             return acc;
         }, {});
@@ -74,7 +87,7 @@ const FeatureManagementModal = ({ isOpen, userId, userName, onClose, onSave }) =
     };
 
     const handleDisableAll = () => {
-        const allDisabled = Object.keys(features).reduce((acc, key) => {
+        const allDisabled = Object.keys(allFeatures).reduce((acc, key) => {
             acc[key] = false;
             return acc;
         }, {});
@@ -203,7 +216,8 @@ const FeatureManagementModal = ({ isOpen, userId, userName, onClose, onSave }) =
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {Object.entries(features).map(([key, enabled]) => {
+                            {(Object.keys(allFeatures).length ? Object.entries(allFeatures) : Object.entries(features)).map(([key, featureInfoOrEnabled]) => {
+                                const enabled = Boolean(features[key]);
                                 const featureInfo = allFeatures[key] || { name: key, description: '' };
                                 return (
                                     <label key={key} style={{

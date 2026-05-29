@@ -537,7 +537,7 @@ async def change_system_password(
 async def get_user_features(
     user_id: str,
     db: Database = Depends(database.get_db),
-    current_user: dict = Depends(auth.get_sysadmin_user)
+    current_user: dict = Depends(auth.get_admin_user)
 ):
     """Get features/permissions for a specific user - System Admin only"""
     user = database.users_collection.find_one({"_id": ObjectId(user_id)})
@@ -572,7 +572,7 @@ async def update_user_features(
     user_id: str,
     features_update: dict,
     db: Database = Depends(database.get_db),
-    current_user: dict = Depends(auth.get_sysadmin_user)
+    current_user: dict = Depends(auth.get_admin_user)
 ):
     """Update features/permissions for a specific user - System Admin only"""
     user = database.users_collection.find_one({"_id": ObjectId(user_id)})
@@ -599,7 +599,7 @@ async def update_user_features(
 
 @router.get("/admin/features-list")
 async def get_all_available_features(
-    current_user: dict = Depends(auth.get_sysadmin_user)
+    current_user: dict = Depends(auth.get_admin_user)
 ):
     """Get list of all available features that can be managed - System Admin only"""
     available_features = {

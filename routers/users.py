@@ -252,7 +252,7 @@ def update_user(user_id: str, user_update: schemas.UserCreate, db: Database = De
 async def get_user_features(
     user_id: str,
     db: Database = Depends(database.get_db),
-    current_user: dict = Depends(auth.get_sysadmin_user)
+    current_user: dict = Depends(auth.get_admin_user)
 ):
     user = database.users_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
@@ -286,7 +286,7 @@ async def update_user_features(
     user_id: str,
     features_update: dict,
     db: Database = Depends(database.get_db),
-    current_user: dict = Depends(auth.get_sysadmin_user)
+    current_user: dict = Depends(auth.get_admin_user)
 ):
     user = database.users_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
@@ -308,7 +308,7 @@ async def update_user_features(
 
 
 @router.get("/admin/features-list")
-async def get_all_available_features(current_user: dict = Depends(auth.get_sysadmin_user)):
+async def get_all_available_features(current_user: dict = Depends(auth.get_admin_user)):
     available_features = {
         "stock_management": {"name": "Stock Management", "description": "Manage inventory and stock levels", "icon": "Package"},
         "ledger_management": {"name": "Ledger Management", "description": "Access party ledger and accounting", "icon": "BookOpen"},

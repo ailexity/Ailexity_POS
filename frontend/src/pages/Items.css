@@ -486,7 +486,7 @@
 
     .items-table tbody {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr;
         gap: 16px;
     }
 
@@ -509,8 +509,9 @@
 
     .items-table td {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
         padding: 0;
         border: none;
     }
@@ -528,8 +529,14 @@
     }
 
     .items-name-group {
-        text-align: right;
-        align-items: flex-end;
+        text-align: left;
+        align-items: flex-start;
+    }
+
+    .items-actions {
+        width: 100%;
+        justify-content: flex-start;
+        gap: 10px;
     }
 
     .items-name {
