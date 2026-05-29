@@ -36,6 +36,7 @@ const POS = () => {
     const isCartOpen = isDesktopView || showCart;
     const businessType = normalizeBusinessType(user?.business_type);
     const isRetailer = businessType === 'retailer';
+    const isAttendee = user?.role === 'attendee';
     const retailBillingTable = useMemo(() => ({
         id: 'retail-billing',
         table_number: null,
@@ -214,6 +215,11 @@ const POS = () => {
     const handleCheckout = async () => {
         if (!cartItems?.length) {
             alert("Please add items to cart before completing order");
+            return;
+        }
+
+        if (isAttendee) {
+            alert("Attendee logins can access billing but cannot complete or send orders. Please ask an admin to finalize the invoice.");
             return;
         }
 
@@ -676,6 +682,11 @@ const POS = () => {
                     )}
 
                     {/* Complete Order Button */}
+                    {isAttendee && (
+                        <div className="mb-4 p-4 rounded-lg" style={{ background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e' }}>
+                            Attendee access is limited: you can add items to the POS cart, but only admins can complete invoices or send orders.
+                        </div>
+                    )}
                     <div className="cart-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <button
                             type="button"
@@ -683,11 +694,11 @@ const POS = () => {
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                if (cartItems?.length > 0) {
+                                if (cartItems?.length > 0 && !isAttendee) {
                                     setShowKOTPrint(true);
                                 }
                             }}
-                            disabled={!cartItems?.length}
+                            disabled={isAttendee || !cartItems?.length}
                             aria-label="Print Kitchen Order Ticket"
                             style={{
                                 background: '#f59e0b',
@@ -709,7 +720,7 @@ const POS = () => {
                                 e.stopPropagation();
                                 handleCheckout();
                             }}
-                            disabled={!!(loading || !cartItems?.length)}
+                            disabled={!!(loading || isAttendee || !cartItems?.length)}
                             aria-label="Complete order and create invoice"
                         >
                             {loading ? "Processing…" : "COMPLETE ORDER"}

@@ -218,6 +218,7 @@ class AttendeeResponse(BaseModel):
     email: Optional[str]
     role: str
     is_active: bool
+    admin_id: Optional[str] = None
     class Config:
         from_attributes = True
 

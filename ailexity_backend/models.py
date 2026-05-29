@@ -69,6 +69,7 @@ class UserDocument:
             "kot_printing": True,
             "order_management": True,
             "payment_tracking": True,
+            "attendees_management": True,
         }
         
         if features is None:

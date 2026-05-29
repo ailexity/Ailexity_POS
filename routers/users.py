@@ -112,7 +112,8 @@ def create_user(user: schemas.UserCreate, db: Database = Depends(database.get_db
         active_window_start=user.active_window_start,
         active_window_end=user.active_window_end,
         enable_multi_device_sync=user.enable_multi_device_sync if user.enable_multi_device_sync is not None else False,
-        enable_order_management=user.enable_order_management if user.enable_order_management is not None else False
+        enable_order_management=user.enable_order_management if user.enable_order_management is not None else False,
+        features=user.features
     )
     result = database.users_collection.insert_one(new_user)
     new_user["_id"] = result.inserted_id
@@ -234,6 +235,9 @@ def update_user(user_id: str, user_update: schemas.UserCreate, db: Database = De
     
     if user_update.password:  # Only update password if provided
         update_data["hashed_password"] = auth.get_password_hash(user_update.password)
+
+    if user_update.features is not None:
+        update_data["features"] = user_update.features
     
     database.users_collection.update_one(
         {"_id": ObjectId(user_id)},
@@ -242,6 +246,147 @@ def update_user(user_id: str, user_update: schemas.UserCreate, db: Database = De
     
     updated_user = database.users_collection.find_one({"_id": ObjectId(user_id)})
     return serialize_doc(updated_user)
+
+
+@router.get("/users/{user_id}/features")
+async def get_user_features(
+    user_id: str,
+    db: Database = Depends(database.get_db),
+    current_user: dict = Depends(auth.get_sysadmin_user)
+):
+    user = database.users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    features = user.get("features", {
+        "stock_management": True,
+        "ledger_management": True,
+        "parties_management": True,
+        "items_management": True,
+        "pos_billing": True,
+        "invoices": True,
+        "alerts": True,
+        "dashboard": True,
+        "admin_panel": True,
+        "kot_printing": True,
+        "order_management": True,
+        "payment_tracking": True,
+        "attendees_management": True,
+    })
+
+    return {
+        "user_id": user_id,
+        "username": user.get("username"),
+        "features": features
+    }
+
+
+@router.put("/users/{user_id}/features")
+async def update_user_features(
+    user_id: str,
+    features_update: dict,
+    db: Database = Depends(database.get_db),
+    current_user: dict = Depends(auth.get_sysadmin_user)
+):
+    user = database.users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    current_features = user.get("features", {})
+    updated_features = {**current_features, **features_update}
+    database.users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"features": updated_features}}
+    )
+
+    return {
+        "status": "success",
+        "message": "User features updated successfully",
+        "user_id": user_id,
+        "features": updated_features
+    }
+
+
+@router.get("/admin/features-list")
+async def get_all_available_features(current_user: dict = Depends(auth.get_sysadmin_user)):
+    available_features = {
+        "stock_management": {"name": "Stock Management", "description": "Manage inventory and stock levels", "icon": "Package"},
+        "ledger_management": {"name": "Ledger Management", "description": "Access party ledger and accounting", "icon": "BookOpen"},
+        "parties_management": {"name": "Parties/Customers Management", "description": "Manage customer and supplier information", "icon": "Users"},
+        "items_management": {"name": "Items Management", "description": "Create and manage product items", "icon": "ShoppingCart"},
+        "pos_billing": {"name": "POS Billing", "description": "Access to billing system", "icon": "CreditCard"},
+        "invoices": {"name": "Invoices", "description": "View and manage invoices", "icon": "FileText"},
+        "alerts": {"name": "Alerts Management", "description": "Configure and manage alerts", "icon": "Bell"},
+        "dashboard": {"name": "Dashboard", "description": "Access to analytics dashboard", "icon": "BarChart3"},
+        "admin_panel": {"name": "Admin Settings", "description": "Access to admin settings", "icon": "Settings"},
+        "kot_printing": {"name": "KOT Printing", "description": "Kitchen Order Ticket printing functionality", "icon": "Printer"},
+        "order_management": {"name": "Order Management", "description": "Manage and track orders", "icon": "ClipboardList"},
+        "payment_tracking": {"name": "Payment Tracking", "description": "Track payments and transactions", "icon": "DollarSign"},
+        "attendees_management": {"name": "Attendees Management", "description": "Create and manage attendee logins", "icon": "UserCheck"},
+    }
+
+    return {
+        "available_features": available_features,
+        "total_features": len(available_features)
+    }
+
+
+@router.post("/attendees", response_model=schemas.AttendeeResponse)
+def create_attendee(attendee: schemas.AttendeeCreate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+    existing = database.users_collection.find_one({"username": attendee.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    hashed_password = auth.get_password_hash(attendee.password)
+    attendee_features = {
+        "pos_billing": True,
+        "invoices": False,
+        "dashboard": False,
+        "admin_panel": False,
+        "attendees_management": False,
+        "stock_management": False,
+        "ledger_management": False,
+        "parties_management": False,
+        "items_management": False,
+        "alerts": False,
+        "order_management": False,
+        "payment_tracking": False,
+        "kot_printing": False,
+    }
+    new_user = UserDocument.create(
+        username=attendee.username,
+        hashed_password=hashed_password,
+        role="attendee",
+        full_name=attendee.full_name,
+        phone=attendee.phone,
+        email=attendee.email,
+        features=attendee_features,
+    )
+    new_user["admin_id"] = current_user["id"]
+    res = database.users_collection.insert_one(new_user)
+    new_user["_id"] = res.inserted_id
+    database.users_collection.update_one({"_id": new_user["_id"]}, {"$set": {"is_verified": True}})
+    return serialize_doc(database.users_collection.find_one({"_id": new_user["_id"]}))
+
+
+@router.get("/attendees", response_model=List[schemas.AttendeeResponse])
+def list_attendees(db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+    query = {"role": "attendee"}
+    if current_user.get("role") != "sysadmin":
+        query["admin_id"] = current_user["id"]
+    docs = list(database.users_collection.find(query))
+    return serialize_docs(docs)
+
+
+@router.delete("/attendees/{attendee_id}")
+def delete_attendee(attendee_id: str, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+    dbu = database.users_collection.find_one({"_id": ObjectId(attendee_id)})
+    if not dbu:
+        raise HTTPException(status_code=404, detail="Attendee not found")
+    if current_user.get("role") != "sysadmin" and dbu.get("admin_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    database.users_collection.delete_one({"_id": ObjectId(attendee_id)})
+    return {"message": "Attendee removed"}
 
 
 @router.post("/users/{user_id}/verify", response_model=schemas.UserResponse)

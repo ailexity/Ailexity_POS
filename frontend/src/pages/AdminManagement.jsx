@@ -718,27 +718,24 @@ const AdminManagement = () => {
 
             {/* Edit User Modal */}
             {showEditModal && selectedUser && (
-                <div className="fixed inset-0 bg-black-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full flex flex-col" style={{ maxHeight: '90vh' }}>
-                        {/* Header */}
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0 bg-white rounded-t-xl">
+                <div className="modal-overlay sysadmin-modal-overlay">
+                    <div className="modal-content sysadmin-edit-modal">
+                        <div className="modal-header">
                             <div className="flex items-center gap-3">
-                                <div className="bg-indigo-50 p-2 rounded-lg">
-                                    <Shield size={24} className="text-indigo-600" />
+                                <div className="sysadmin-modal-icon small">
+                                    <Edit size={20} />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-gray-900">Edit User Account</h2>
+                                    <h2 className="text-xl font-bold">Edit User Account</h2>
                                     <p className="text-sm text-gray-500">Update system access and business profile</p>
                                 </div>
                             </div>
                             <button
                                 type="button"
-                                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg p-2 transition-all"
+                                className="btn-icon"
                                 onClick={() => { setShowEditModal(false); setError(''); }}
                             >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <X size={18} />
                             </button>
                         </div>
 
@@ -749,7 +746,8 @@ const AdminManagement = () => {
                             </div>
                         )}
 
-                        <form onSubmit={handleUpdateUser} className="flex-1 overflow-y-auto p-6 bg-gray-50-50">
+                        <form onSubmit={handleUpdateUser} className="sysadmin-edit-form">
+                            <div className="modal-body sysadmin-edit-body">
 
                             {/* Account Credentials */}
                             <div className="form-section">
@@ -793,7 +791,7 @@ const AdminManagement = () => {
                                                 />
                                                 <button
                                                     type="button"
-                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                    className="btn-icon password-toggle-btn"
                                                     onClick={() => setShowPassword(!showPassword)}
                                                 >
                                                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -954,26 +952,22 @@ const AdminManagement = () => {
                                 </div>
                             </div>
 
-                        </form>
+                            </div>
 
-                        {/* Footer Actions */}
-                        <div className="p-4 border-t border-gray-200 bg-white rounded-b-xl flex gap-3 justify-end flex-shrink-0">
-                            <button
-                                type="button"
-                                className="btn-secondary"
-                                onClick={() => { setShowEditModal(false); setError(''); }}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                onClick={handleUpdateUser} /* Trigger form submit via button click if needed, or rely on form submit */
-                                className="btn"
-                            >
-                                <Edit size={16} />
-                                Save Changes
-                            </button>
-                        </div>
+                            <div className="modal-footer justify-end">
+                                <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    onClick={() => { setShowEditModal(false); setError(''); }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn">
+                                    <Edit size={16} />
+                                    Save Changes
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

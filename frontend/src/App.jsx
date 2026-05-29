@@ -22,15 +22,26 @@ import InvoiceView from './pages/InvoiceView';
 import StockManagement from './pages/StockManagement';
 import PartyManagement from './pages/PartyManagement';
 import LedgerManagement from './pages/LedgerManagement';
+import AttendeesManagement from './pages/AttendeesManagement';
+import { Lock } from 'lucide-react';
 import './index.css';
+import { canAccessOrderManagement, getDefaultUserPath, hasFeature, normalizeBusinessType } from './utils/featureAccess';
 
-const normalizeBusinessType = (businessType) => {
-  const value = String(businessType || '').toLowerCase();
-  if (value.includes('retail')) return 'retailer';
-  return 'restaurant';
-};
+const AccessDisabled = () => (
+  <div className="page-container with-mobile-header-offset">
+    <div className="content-area">
+      <div className="access-disabled-card">
+        <div className="access-disabled-icon">
+          <Lock size={28} />
+        </div>
+        <h2>Feature locked</h2>
+        <p className="text-muted mt-2">This feature is restricted by the system admin. Please contact admin to access it.</p>
+      </div>
+    </div>
+  </div>
+);
 
-const BusinessTypeRoute = ({ allow, children }) => {
+const BusinessTypeRoute = ({ allow, feature, children }) => {
   const { user } = useAuth();
 
   if (!user) return <Navigate to="/login" replace />;
@@ -38,7 +49,27 @@ const BusinessTypeRoute = ({ allow, children }) => {
 
   const businessType = normalizeBusinessType(user.business_type);
   if (!allow.includes(businessType)) {
-    return <Navigate to={businessType === 'retailer' ? '/stock' : '/dashboard'} replace />;
+    return <Navigate to={getDefaultUserPath(user)} replace />;
+  }
+
+  const featureAllowed = feature === 'order_management'
+    ? canAccessOrderManagement(user)
+    : hasFeature(user, feature);
+
+  if (!featureAllowed) {
+    return <AccessDisabled />;
+  }
+
+  return children;
+};
+
+const FeatureRoute = ({ feature, children }) => {
+  const { user } = useAuth();
+
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'sysadmin') return <Navigate to="/system" replace />;
+  if (!hasFeature(user, feature)) {
+    return <AccessDisabled />;
   }
 
   return children;
@@ -93,39 +124,39 @@ const KeyboardShortcuts = () => {
         switch (e.key.toLowerCase()) {
           case 'd':
             e.preventDefault();
-            navigate(isSysAdmin ? '/system' : '/dashboard');
+            navigate(isSysAdmin ? '/system' : hasFeature(user, 'dashboard') ? '/dashboard' : getDefaultUserPath(user));
             break;
           case 'b':
             e.preventDefault();
-            if (!isSysAdmin) navigate('/pos');
+            if (!isSysAdmin && hasFeature(user, 'pos_billing')) navigate('/pos');
             break;
           case 'h':
             e.preventDefault();
-            if (!isSysAdmin) navigate('/history');
+            if (!isSysAdmin && hasFeature(user, 'invoices')) navigate('/history');
             break;
           case 'i':
             e.preventDefault();
-            if (isRestaurant) navigate('/items');
+            if (isRestaurant && hasFeature(user, 'items_management')) navigate('/items');
             break;
           case 'k':
             e.preventDefault();
-            if (isRetailer) navigate('/stock');
+            if (isRetailer && hasFeature(user, 'stock_management')) navigate('/stock');
             break;
           case 'p':
             e.preventDefault();
-            if (isRetailer) navigate('/parties');
+            if (isRetailer && hasFeature(user, 'parties_management')) navigate('/parties');
             break;
           case 'g':
             e.preventDefault();
-            if (isRetailer) navigate('/ledger');
+            if (isRetailer && hasFeature(user, 'ledger_management')) navigate('/ledger');
             break;
           case 'o':
             e.preventDefault();
-            if (isRestaurant && user?.enable_order_management) navigate('/orders');
+            if (isRestaurant && canAccessOrderManagement(user)) navigate('/orders');
             break;
           case 's':
             e.preventDefault();
-            if (!isSysAdmin) navigate('/settings');
+            if (!isSysAdmin && hasFeature(user, 'admin_panel')) navigate('/settings');
             break;
           case 'a':
             e.preventDefault();
@@ -186,18 +217,19 @@ function App() {
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
               <Route path="/app" element={<DashboardRedirect />} />
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard" element={<FeatureRoute feature="dashboard"><Dashboard /></FeatureRoute>} />
               <Route path="/system" element={<SystemDashboard />} />
-              <Route path="/pos" element={<POS />} />
-              <Route path="/items" element={<BusinessTypeRoute allow={['restaurant']}><Items /></BusinessTypeRoute>} />
-              <Route path="/history" element={<BusinessTypeRoute allow={['restaurant', 'retailer']}><History /></BusinessTypeRoute>} />
-              <Route path="/orders" element={<BusinessTypeRoute allow={['restaurant']}><OrderManagement /></BusinessTypeRoute>} />
-              <Route path="/stock" element={<BusinessTypeRoute allow={['retailer']}><StockManagement /></BusinessTypeRoute>} />
-              <Route path="/parties" element={<BusinessTypeRoute allow={['retailer']}><PartyManagement /></BusinessTypeRoute>} />
-              <Route path="/ledger" element={<BusinessTypeRoute allow={['retailer']}><LedgerManagement /></BusinessTypeRoute>} />
+              <Route path="/pos" element={<FeatureRoute feature="pos_billing"><POS /></FeatureRoute>} />
+              <Route path="/items" element={<BusinessTypeRoute allow={['restaurant']} feature="items_management"><Items /></BusinessTypeRoute>} />
+              <Route path="/history" element={<BusinessTypeRoute allow={['restaurant', 'retailer']} feature="invoices"><History /></BusinessTypeRoute>} />
+              <Route path="/orders" element={<BusinessTypeRoute allow={['restaurant']} feature="order_management"><OrderManagement /></BusinessTypeRoute>} />
+              <Route path="/stock" element={<BusinessTypeRoute allow={['retailer']} feature="stock_management"><StockManagement /></BusinessTypeRoute>} />
+              <Route path="/parties" element={<BusinessTypeRoute allow={['retailer']} feature="parties_management"><PartyManagement /></BusinessTypeRoute>} />
+              <Route path="/ledger" element={<BusinessTypeRoute allow={['retailer']} feature="ledger_management"><LedgerManagement /></BusinessTypeRoute>} />
+              <Route path="/attendees" element={<FeatureRoute feature="attendees_management"><AttendeesManagement /></FeatureRoute>} />
               <Route path="/admin" element={<AdminManagement />} />
               <Route path="/alerts" element={<AlertsManagement />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/settings" element={<FeatureRoute feature="admin_panel"><Settings /></FeatureRoute>} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" />} />

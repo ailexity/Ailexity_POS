@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 
 # --- User Schemas ---
@@ -32,6 +32,7 @@ class UserBase(BaseModel):
     active_window_end: Optional[str] = None  # Login access end date (YYYY-MM-DD)
     enable_multi_device_sync: Optional[bool] = False  # Enable multi-device cart sync
     enable_order_management: Optional[bool] = False  # Enable order management feature
+    features: Optional[Dict[str, bool]] = None  # Managed access flags for user features
 
 class UserCreate(UserBase):
     password: str
@@ -188,6 +189,27 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+
+class AttendeeCreate(BaseModel):
+    username: str
+    password: str
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+
+class AttendeeResponse(BaseModel):
+    id: str
+    username: str
+    full_name: Optional[str]
+    phone: Optional[str]
+    email: Optional[str]
+    role: str
+    is_active: bool
+    admin_id: Optional[str] = None
+    class Config:
+        from_attributes = True
 
 # --- System Settings Schemas ---
 class SystemPasswordChange(BaseModel):
