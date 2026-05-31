@@ -20,7 +20,7 @@ const EmployeesManagement = () => {
       const response = await api.get('/attendees');
       setAttendees(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to load attendees' });
+      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to load employees' });
     } finally {
       setLoading(false);
     }
@@ -116,7 +116,7 @@ const EmployeesManagement = () => {
   if (loading) {
     return (
       <div className="page-container with-mobile-header-offset">
-        <PageLoader message="Loading attendees..." />
+        <PageLoader message="Loading employees..." />
       </div>
     );
   }
@@ -270,8 +270,8 @@ const EmployeesManagement = () => {
                   ))}
                   {attendees.length === 0 && (
                     <tr>
-                      <td colSpan="4" className="text-center text-muted" style={{ padding: '32px' }}>
-                        No attendee logins created yet.
+                      <td colSpan="5" className="text-center text-muted" style={{ padding: '32px' }}>
+                        No employee logins created yet.
                       </td>
                     </tr>
                   )}

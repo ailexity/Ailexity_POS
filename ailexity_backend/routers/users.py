@@ -333,51 +333,138 @@ def verify_user_by_sysadmin(user_id: str, db: Database = Depends(database.get_db
 
 @router.post("/attendees", response_model=schemas.AttendeeResponse)
 def create_attendee(attendee: schemas.AttendeeCreate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
-    # Admin or sysadmin can create attendees (waiters)
+    # Admin or sysadmin can create attendee or kitchen display users
     existing = database.users_collection.find_one({"username": attendee.username})
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
+
     owner_admin_id = current_user["id"]
     hashed_password = auth.get_password_hash(attendee.password)
-    attendee_features = {
-        "pos_billing": True,
-        "invoices": False,
-        "dashboard": False,
-        "admin_panel": False,
-        "attendees_management": False,
-        "stock_management": False,
-        "ledger_management": False,
-        "parties_management": False,
-        "items_management": False,
-        "alerts": False,
-        "order_management": False,
-        "payment_tracking": False,
-        "kot_printing": False,
-    }
+    role = (attendee.role or 'attendee').strip().lower()
+    if role not in ["attendee", "kitchen"]:
+        raise HTTPException(status_code=400, detail="Invalid employee type")
+
+    if role == "kitchen":
+        user_features = {
+            "pos_billing": False,
+            "invoices": False,
+            "dashboard": False,
+            "admin_panel": False,
+            "attendees_management": False,
+            "stock_management": False,
+            "ledger_management": False,
+            "parties_management": False,
+            "items_management": False,
+            "alerts": False,
+            "order_management": False,
+            "payment_tracking": False,
+            "kot_printing": True,
+        }
+    else:
+        user_features = {
+            "pos_billing": True,
+            "invoices": False,
+            "dashboard": False,
+            "admin_panel": False,
+            "attendees_management": False,
+            "stock_management": False,
+            "ledger_management": False,
+            "parties_management": False,
+            "items_management": False,
+            "alerts": False,
+            "order_management": False,
+            "payment_tracking": False,
+            "kot_printing": False,
+        }
+
     new_user = UserDocument.create(
         username=attendee.username,
         hashed_password=hashed_password,
-        role='attendee',
+        role=role,
         full_name=attendee.full_name,
         phone=attendee.phone,
         email=attendee.email,
-        features=attendee_features,
+        features=user_features,
     )
     new_user["admin_id"] = owner_admin_id
     res = database.users_collection.insert_one(new_user)
     new_user["_id"] = res.inserted_id
-    # Attendees are considered verified for immediate login
     database.users_collection.update_one({"_id": new_user["_id"]}, {"$set": {"is_verified": True}})
     return serialize_doc(database.users_collection.find_one({"_id": new_user["_id"]}))
 
 
 @router.get("/attendees", response_model=List[schemas.AttendeeResponse])
 def list_attendees(db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
-    query = {"role": "attendee"}
+    query = {"role": {"$in": ["attendee", "kitchen"]}}
     if current_user.get("role") != "sysadmin":
         query["admin_id"] = current_user["id"]
     docs = list(database.users_collection.find(query))
     return serialize_docs(docs)
+
+
+@router.put("/attendees/{attendee_id}", response_model=schemas.AttendeeResponse)
+def update_attendee(attendee_id: str, attendee: schemas.AttendeeUpdate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+    dbu = database.users_collection.find_one({"_id": ObjectId(attendee_id)})
+    if not dbu:
+        raise HTTPException(status_code=404, detail="Attendee not found")
+    if current_user.get("role") != "sysadmin" and dbu.get("admin_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    update_data = {}
+    if attendee.username and attendee.username != dbu.get("username"):
+        if database.users_collection.find_one({"username": attendee.username}):
+            raise HTTPException(status_code=400, detail="Username already exists")
+        update_data["username"] = attendee.username
+    if attendee.password:
+        update_data["hashed_password"] = auth.get_password_hash(attendee.password)
+    if attendee.full_name is not None:
+        update_data["full_name"] = attendee.full_name
+    if attendee.phone is not None:
+        update_data["phone"] = attendee.phone
+    if attendee.email is not None:
+        update_data["email"] = attendee.email
+    if attendee.role:
+        role = attendee.role.strip().lower()
+        if role not in ["attendee", "kitchen"]:
+            raise HTTPException(status_code=400, detail="Invalid employee type")
+        update_data["role"] = role
+        if role == "kitchen":
+            update_data["features"] = {
+                "pos_billing": False,
+                "invoices": False,
+                "dashboard": False,
+                "admin_panel": False,
+                "attendees_management": False,
+                "stock_management": False,
+                "ledger_management": False,
+                "parties_management": False,
+                "items_management": False,
+                "alerts": False,
+                "order_management": False,
+                "payment_tracking": False,
+                "kot_printing": True,
+            }
+        else:
+            update_data["features"] = {
+                "pos_billing": True,
+                "invoices": False,
+                "dashboard": False,
+                "admin_panel": False,
+                "attendees_management": False,
+                "stock_management": False,
+                "ledger_management": False,
+                "parties_management": False,
+                "items_management": False,
+                "alerts": False,
+                "order_management": False,
+                "payment_tracking": False,
+                "kot_printing": False,
+            }
+    if update_data:
+        database.users_collection.update_one({"_id": ObjectId(attendee_id)}, {"$set": update_data})
+
+    updated = database.users_collection.find_one({"_id": ObjectId(attendee_id)})
+    return serialize_doc(updated)
 
 
 @router.delete("/attendees/{attendee_id}")

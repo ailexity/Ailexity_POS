@@ -208,6 +208,16 @@ class AttendeeCreate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    role: Optional[str] = 'attendee'
+
+
+class AttendeeUpdate(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
 
 
 class AttendeeResponse(BaseModel):

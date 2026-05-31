@@ -66,7 +66,7 @@ const Sidebar = () => {
                             <SidebarItem to="/dashboard" icon={Home} label="Dashboard" locked={!hasFeature(user, 'dashboard')} />
                             <SidebarItem to="/pos" icon={ShoppingCart} label="Billing" locked={!hasFeature(user, 'pos_billing')} />
                             <SidebarItem to="/history" icon={FileText} label={isRetailer ? 'Invoices' : 'History'} locked={!hasFeature(user, 'invoices')} />
-                            <SidebarItem to="/attendees" icon={UserCheck} label="Attendees" locked={!hasFeature(user, 'attendees_management')} />
+                            <SidebarItem to="/employees" icon={UserCheck} label="Employees" locked={!hasFeature(user, 'attendees_management')} />
                         </div>
 
                         {isRestaurant && (

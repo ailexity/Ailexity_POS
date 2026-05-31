@@ -45,7 +45,7 @@ const MobileNav = () => {
                     <MobileNavItem to="/dashboard" icon={Home} label="Dashboard" locked={!hasFeature(user, 'dashboard')} />
                     <MobileNavItem to="/pos" icon={ShoppingBag} label="Billing" locked={!hasFeature(user, 'pos_billing')} />
                     <MobileNavItem to="/history" icon={FileText} label={isRetailer ? 'Invoices' : 'History'} locked={!hasFeature(user, 'invoices')} />
-                    <MobileNavItem to="/attendees" icon={UserCheck} label="Attendees" locked={!hasFeature(user, 'attendees_management')} />
+                    <MobileNavItem to="/employees" icon={UserCheck} label="Employees" locked={!hasFeature(user, 'attendees_management')} />
                     {isRestaurant && (
                         <>
                             <MobileNavItem to="/items" icon={Package} label="Inventory" locked={!hasFeature(user, 'items_management')} />

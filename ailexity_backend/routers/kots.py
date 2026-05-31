@@ -133,6 +133,8 @@ async def list_kots(
 
         for kot in kots:
             kot["id"] = str(kot["_id"])
+            if "_id" in kot:
+                del kot["_id"]
 
         return kots
 
@@ -163,6 +165,8 @@ async def get_pending_kots(
 
         for kot in kots:
             kot["id"] = str(kot["_id"])
+            if "_id" in kot:
+                del kot["_id"]
 
         return kots
 

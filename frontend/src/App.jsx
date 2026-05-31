@@ -23,7 +23,7 @@ import InvoiceView from './pages/InvoiceView';
 import StockManagement from './pages/StockManagement';
 import PartyManagement from './pages/PartyManagement';
 import LedgerManagement from './pages/LedgerManagement';
-import AttendeesManagement from './pages/AttendeesManagement';
+import EmployeesManagement from './pages/EmployeesManagement';
 import { Lock } from 'lucide-react';
 import './index.css';
 import { canAccessOrderManagement, getDefaultUserPath, hasFeature, normalizeBusinessType } from './utils/featureAccess';
@@ -228,7 +228,7 @@ function App() {
               <Route path="/stock" element={<BusinessTypeRoute allow={['retailer']} feature="stock_management"><StockManagement /></BusinessTypeRoute>} />
               <Route path="/parties" element={<BusinessTypeRoute allow={['retailer']} feature="parties_management"><PartyManagement /></BusinessTypeRoute>} />
               <Route path="/ledger" element={<BusinessTypeRoute allow={['retailer']} feature="ledger_management"><LedgerManagement /></BusinessTypeRoute>} />
-              <Route path="/attendees" element={<FeatureRoute feature="attendees_management"><AttendeesManagement /></FeatureRoute>} />
+              <Route path="/employees" element={<FeatureRoute feature="attendees_management"><EmployeesManagement /></FeatureRoute>} />
               <Route path="/admin" element={<AdminManagement />} />
               <Route path="/alerts" element={<AlertsManagement />} />
               <Route path="/settings" element={<FeatureRoute feature="admin_panel"><Settings /></FeatureRoute>} />
