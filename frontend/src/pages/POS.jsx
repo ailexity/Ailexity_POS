@@ -30,6 +30,8 @@ const POS = () => {
     const [showTableSelector, setShowTableSelector] = useState(false);
     const [showCart, setShowCart] = useState(false);
     const [showKOTPrint, setShowKOTPrint] = useState(false);
+    const [showKOTOptions, setShowKOTOptions] = useState(false);
+    const [autoPrintKOT, setAutoPrintKOT] = useState(false);
     const [isDesktopView, setIsDesktopView] = useState(() => window.innerWidth >= DESKTOP_BREAKPOINT);
     const [cartMaxHeight, setCartMaxHeight] = useState(null);
     const cartPanelRef = useRef(null);
@@ -314,6 +316,39 @@ const POS = () => {
             setLoading(false);
         }
     };
+
+        const sendToKOTDisplay = async () => {
+            if (!cartItems?.length) return;
+            try {
+                const payload = {
+                    table_number: isRetailer ? null : (selectedTable?.table_number || null),
+                    table_name: isRetailer ? null : (selectedTable?.table_name || null),
+                    items: cartItems.map((i) => ({
+                        item_id: i.id != null ? String(i.id) : null,
+                        item_name: String(i.name || ""),
+                        quantity: Math.max(1, Math.floor(Number(i.qty) || 1)),
+                        unit_price: Number(i.price) || 0,
+                    })),
+                    notes: ''
+                };
+
+                await api.post('/kots/', payload);
+                alert('Order sent to KOT display');
+                setShowKOTOptions(false);
+            } catch (e) {
+                console.error('KOT send error', e);
+                let msg = 'Failed to send order to KOT display';
+                if (e.response?.data?.detail) msg = e.response.data.detail;
+                alert(msg);
+            }
+        };
+
+        const printViaBluetooth = () => {
+            // Admin flow: open KOT print dialog and trigger auto-print
+            setShowKOTOptions(false);
+            setAutoPrintKOT(true);
+            setShowKOTPrint(true);
+        };
 
     const shareWhatsApp = async (invoice) => {
         // Get customer name for personalization
@@ -700,7 +735,7 @@ const POS = () => {
                     {/* Complete Order Button */}
                     {isAttendee && (
                         <div className="mb-4 p-4 rounded-lg" style={{ background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e' }}>
-                            Attendee access is limited: you can add items to the POS cart, but only admins can complete invoices or send orders.
+                            Attendee access is limited: you can add items to the POS cart, and send orders to the kitchen display. Only admins can print to a Bluetooth KOT printer or complete invoices.
                         </div>
                     )}
                     <div className="cart-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -710,12 +745,11 @@ const POS = () => {
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                if (cartItems?.length > 0 && !isAttendee) {
-                                    setShowKOTPrint(true);
-                                }
+                                if (!cartItems?.length) return;
+                                setShowKOTOptions(true);
                             }}
-                            disabled={isAttendee || !cartItems?.length}
-                            aria-label="Print Kitchen Order Ticket"
+                            disabled={!cartItems?.length}
+                            aria-label="Print / Send Kitchen Order"
                             style={{
                                 background: '#f59e0b',
                                 display: 'flex',
@@ -747,13 +781,34 @@ const POS = () => {
                 )}
             </div>
 
+            {/* KOT Options Modal */}
+            {showKOTOptions && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+                    <div style={{ width: 360, background: '#fff', borderRadius: 8, padding: 16, boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+                        <h3 style={{ margin: 0, marginBottom: 12 }}>Send order to kitchen</h3>
+                        <p style={{ marginTop: 0, marginBottom: 12, color: '#374151' }}>Choose how to send this order to the kitchen.</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <button className="btn" onClick={async () => await sendToKOTDisplay()} style={{ background: '#06b6d4', color: '#fff' }}>Send to KOT Display</button>
+                            {!isAttendee && (
+                                <button className="btn" onClick={() => printViaBluetooth()} style={{ background: '#f59e0b', color: '#fff' }}>Print via Bluetooth</button>
+                            )}
+                            <button className="btn" onClick={() => setShowKOTOptions(false)} style={{ background: '#efefef' }}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* KOT Print Dialog */}
             <KOTPrintDialog
                 isOpen={showKOTPrint}
                 order={{ items: cartItems }}
                 tableInfo={isRetailer ? null : selectedTable}
                 businessName={user?.business_name || 'Ailexity POS'}
-                onClose={() => setShowKOTPrint(false)}
+                autoPrint={autoPrintKOT}
+                onClose={() => {
+                    setShowKOTPrint(false);
+                    setAutoPrintKOT(false);
+                }}
                 onSuccess={() => {
                     // Optional: Clear cart after successful KOT print
                     // clearCart();

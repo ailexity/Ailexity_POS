@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PrinterIcon, Send, X, CheckCircle, AlertCircle } from 'lucide-react';
 import api from '../api';
 import { kotGenerator } from '../utils/kotGenerator';
 
-const KOTPrintDialog = ({ isOpen, order, tableInfo, businessName, onClose, onSuccess }) => {
+const KOTPrintDialog = ({ isOpen, order, tableInfo, businessName, onClose, onSuccess, autoPrint = false }) => {
     const [printType, setPrintType] = useState('bluetooth'); // bluetooth | regular | preview
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState(null); // null | 'success' | 'error'
@@ -94,6 +94,17 @@ const KOTPrintDialog = ({ isOpen, order, tableInfo, businessName, onClose, onSuc
         setMessage('');
         onClose();
     };
+
+    useEffect(() => {
+        if (isOpen && autoPrint) {
+            // small delay to allow dialog to mount
+            setTimeout(() => {
+                setPrintType('bluetooth');
+                handlePrintBluetoothPrinter();
+            }, 250);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, autoPrint]);
 
     return (
         <div style={{
