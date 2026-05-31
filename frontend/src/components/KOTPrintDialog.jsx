@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PrinterIcon, Send, X, CheckCircle, AlertCircle } from 'lucide-react';
+import api from '../api';
 import { kotGenerator } from '../utils/kotGenerator';
 
 const KOTPrintDialog = ({ isOpen, order, tableInfo, businessName, onClose, onSuccess }) => {
@@ -10,10 +11,20 @@ const KOTPrintDialog = ({ isOpen, order, tableInfo, businessName, onClose, onSuc
 
     if (!isOpen) return null;
 
+    const createKOTRecord = async () => {
+        await api.post('/kots/', {
+            table_number: tableInfo?.table_number,
+            table_name: tableInfo?.table_name,
+            items: order.items || [],
+            notes: order.notes || ''
+        });
+    };
+
     const handlePrintBluetoothPrinter = async () => {
         setLoading(true);
         setStatus(null);
         try {
+            await createKOTRecord();
             const result = await kotGenerator.printToBluetoothPrinter(order, {
                 businessName,
                 tableInfo
@@ -26,17 +37,18 @@ const KOTPrintDialog = ({ isOpen, order, tableInfo, businessName, onClose, onSuc
             }, 2000);
         } catch (error) {
             setStatus('error');
-            setMessage(error.message || 'Failed to print to Bluetooth printer');
+            setMessage(error.response?.data?.detail || error.message || 'Failed to print to Bluetooth printer');
             console.error('KOT Bluetooth print error:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handlePrintRegularPrinter = () => {
+    const handlePrintRegularPrinter = async () => {
         setLoading(true);
         setStatus(null);
         try {
+            await createKOTRecord();
             kotGenerator.printToRegularPrinter(order, {
                 businessName,
                 tableInfo
@@ -49,15 +61,18 @@ const KOTPrintDialog = ({ isOpen, order, tableInfo, businessName, onClose, onSuc
             }, 2000);
         } catch (error) {
             setStatus('error');
-            setMessage(error.message || 'Failed to open print dialog');
+            setMessage(error.response?.data?.detail || error.message || 'Failed to open print dialog');
             console.error('KOT print error:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handlePreviewKOT = () => {
+    const handlePreviewKOT = async () => {
+        setStatus(null);
+        setLoading(true);
         try {
+            await createKOTRecord();
             kotGenerator.previewKOT(order, {
                 businessName,
                 tableInfo
@@ -66,7 +81,9 @@ const KOTPrintDialog = ({ isOpen, order, tableInfo, businessName, onClose, onSuc
             setMessage('✓ Preview opened in new window');
         } catch (error) {
             setStatus('error');
-            setMessage(error.message || 'Failed to open preview');
+            setMessage(error.response?.data?.detail || error.message || 'Failed to open preview');
+        } finally {
+            setLoading(false);
         }
     };
 

@@ -373,6 +373,17 @@ const AdminManagement = () => {
                     <div className="card">
                         <div className="flex items-center justify-between">
                             <div>
+                                <p className="text-sm text-muted mb-2">Kitchen Staff</p>
+                                <h2 className="text-2xl font-bold">{users.filter(u => u.role === 'kitchen').length}</h2>
+                            </div>
+                            <div className="p-3" style={{ background: '#d1fae5' }}>
+                                <CheckCircle size={24} color="#16a34a" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="card">
+                        <div className="flex items-center justify-between">
+                            <div>
                                 <p className="text-sm text-muted mb-2">System Admins</p>
                                 <h2 className="text-2xl font-bold">{users.filter(u => u.role === 'sysadmin').length}</h2>
                             </div>
@@ -440,8 +451,8 @@ const AdminManagement = () => {
                                         </td>
                                         <td>{u.business_name || '-'}</td>
                                         <td>
-                                            <span className={`badge ${u.role === 'admin' ? 'bg-blue-500' : 'bg-purple-500'}`}>
-                                                {u.role === 'admin' ? 'Admin' : 'System Admin'}
+                                            <span className={`badge ${u.role === 'admin' ? 'bg-blue-500' : u.role === 'sysadmin' ? 'bg-purple-500' : 'bg-emerald-500'}`}>
+                                                {u.role === 'admin' ? 'Admin' : u.role === 'sysadmin' ? 'System Admin' : u.role === 'kitchen' ? 'Kitchen' : u.role}
                                             </span>
                                         </td>
                                         <td>
@@ -686,8 +697,14 @@ const AdminManagement = () => {
                                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                 >
                                     <option value="admin">Administrator</option>
+                                    <option value="kitchen">Kitchen Staff</option>
                                     <option value="sysadmin">System Administrator</option>
                                 </select>
+                                {formData.role === 'kitchen' && (
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Kitchen staff can log in immediately with KOT and order status access.
+                                    </p>
+                                )}
                             </div>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-2">Subscription Status</label>
