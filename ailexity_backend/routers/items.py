@@ -25,9 +25,10 @@ def read_items(
         # SysAdmin can see all items (read-only)
         items = list(database.items_collection.find({}).skip(skip).limit(limit))
     else:
-        # Admin sees only their own items
+        # Admin and attendee users see items for their parent admin tenant
+        tenant_admin_id = auth.resolve_admin_id(current_user)
         items = list(database.items_collection.find(
-            {"admin_id": current_user["id"]}
+            {"admin_id": tenant_admin_id}
         ).skip(skip).limit(limit))
     return serialize_docs(items)
 

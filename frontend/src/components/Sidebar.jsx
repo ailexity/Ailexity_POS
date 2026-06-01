@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { Home, ShoppingCart, Package, FileText, Settings, LogOut, Shield, BarChart3, Bell, Box, Boxes, Users, DollarSign, UserCheck, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { canAccessOrderManagement, hasFeature, normalizeBusinessType } from '../utils/featureAccess';
+import { canAccessOrderManagement, hasFeature, normalizeBusinessType, isLimitedRoleUser } from '../utils/featureAccess';
 
 const accessMessage = 'This feature is locked for your account. Please contact admin to access it.';
 
@@ -34,6 +34,7 @@ const SidebarItem = ({ to, icon: Icon, label, locked = false }) => {
 const Sidebar = () => {
     const { logout, user } = useAuth();
     const isSysAdmin = user?.role === 'sysadmin';
+    const isLimited = isLimitedRoleUser(user);
     const businessType = normalizeBusinessType(user?.business_type);
     const isRetailer = !isSysAdmin && businessType === 'retailer';
     const isRestaurant = !isSysAdmin && businessType === 'restaurant';
@@ -47,9 +48,9 @@ const Sidebar = () => {
 
             <div className="sidebar-status">
                 <span className="sidebar-status-badge">
-                    {isSysAdmin ? 'Sysadmin Workspace' : businessType === 'retailer' ? 'Retailer Workspace' : 'Restaurant Workspace'}
+                    {isSysAdmin ? 'Sysadmin Workspace' : isLimited ? (user?.role === 'kitchen' ? 'Kitchen Display' : 'Attendee Workspace') : businessType === 'retailer' ? 'Retailer Workspace' : 'Restaurant Workspace'}
                 </span>
-                {!isSysAdmin && (
+                {!isSysAdmin && !isLimited && (
                     <p className="sidebar-status-copy">
                         {isRetailer
                             ? 'Organized for invoices, stock flow, party credit, and ledger control.'
@@ -59,7 +60,18 @@ const Sidebar = () => {
             </div>
 
             <nav>
-                {!isSysAdmin && (
+                {isLimited ? (
+                    // Simplified menu for KOT/attendee users - only show unlocked items
+                    <div className="sidebar-group">
+                        <div className="sidebar-group-title">Menu</div>
+                        {user?.role === 'kitchen' && hasFeature(user, 'kot_printing') && (
+                            <SidebarItem to="/kots" icon={Package} label="Kitchen Orders" />
+                        )}
+                        {user?.role === 'attendee' && hasFeature(user, 'pos_billing') && (
+                            <SidebarItem to="/pos" icon={ShoppingCart} label="Billing" />
+                        )}
+                    </div>
+                ) : !isSysAdmin && (
                     <>
                         <div className="sidebar-group">
                             <div className="sidebar-group-title">Core tools</div>
@@ -112,11 +124,11 @@ const Sidebar = () => {
                 <div className="user-info">
                     <div className="user-name">{user?.username}</div>
                     <div className="user-role">
-                        {user?.role}{!isSysAdmin ? ` · ${businessType}` : ''}
+                        {user?.role}{!isSysAdmin && !isLimited ? ` · ${businessType}` : ''}
                     </div>
                 </div>
 
-                {!isSysAdmin && (
+                {!isSysAdmin && !isLimited && (
                     <SidebarItem to="/settings" icon={Settings} label="Settings" locked={!hasFeature(user, 'admin_panel')} />
                 )}
 
@@ -127,6 +139,6 @@ const Sidebar = () => {
             </div>
         </div>
     );
-};
+}};
 
 export default Sidebar;

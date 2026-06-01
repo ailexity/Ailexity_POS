@@ -34,6 +34,7 @@ const POS = () => {
     const [autoPrintKOT, setAutoPrintKOT] = useState(false);
     const [isDesktopView, setIsDesktopView] = useState(() => window.innerWidth >= DESKTOP_BREAKPOINT);
     const [cartMaxHeight, setCartMaxHeight] = useState(null);
+    const [kotStatuses, setKotStatuses] = useState({}); // Track KOT status by table
     const cartPanelRef = useRef(null);
     const isCartOpen = isDesktopView || showCart;
     const businessType = normalizeBusinessType(user?.business_type);

@@ -68,6 +68,16 @@ async def get_current_active_user(current_user: dict = Depends(get_current_user)
         raise HTTPException(status_code=403, detail="Account is inactive")
     return current_user
 
+def resolve_admin_id(current_user: dict):
+    """Resolve tenant admin ID for user scopes.
+
+    Attendee and kitchen users belong to an admin account via admin_id,
+    whereas admin users own their own data.
+    """
+    if current_user is None:
+        return None
+    return current_user.get("admin_id") or current_user.get("id")
+
 async def get_admin_user(current_user: dict = Depends(get_current_active_user)):
     if current_user.get("role") not in ["admin", "sysadmin"]:  # Both admin and sysadmin can access admin features
         raise HTTPException(status_code=403, detail="Not enough permissions")
