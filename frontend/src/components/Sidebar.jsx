@@ -85,8 +85,9 @@ const Sidebar = () => {
                             <div className="sidebar-group">
                                 <div className="sidebar-group-title">Restaurant features</div>
                                 <SidebarItem to="/items" icon={Package} label="Inventory" locked={!hasFeature(user, 'items_management')} />
-                        <SidebarItem to="/orders" icon={Box} label="Online Orders" locked={!canAccessOrderManagement(user)} />
-                        <SidebarItem to="/kots" icon={Package} label="Kitchen Orders" locked={!hasFeature(user, 'kot_printing')} />
+                                <SidebarItem to="/stock" icon={Boxes} label="Stock" locked={!hasFeature(user, 'stock_management')} />
+                                <SidebarItem to="/orders" icon={Box} label="Online Orders" locked={!canAccessOrderManagement(user)} />
+                                <SidebarItem to="/kots" icon={Package} label="Kitchen Orders" locked={!hasFeature(user, 'kot_printing')} />
                             </div>
                         )}
 

@@ -61,6 +61,7 @@ const MobileNav = () => {
                         {isRestaurant && (
                             <>
                                 <MobileNavItem to="/items" icon={Package} label="Inventory" locked={!hasFeature(user, 'items_management')} />
+                                <MobileNavItem to="/stock" icon={Boxes} label="Stock" locked={!hasFeature(user, 'stock_management')} />
                                 <MobileNavItem to="/orders" icon={Package} label="Online Orders" locked={!canAccessOrderManagement(user)} />
                             </>
                         )}
