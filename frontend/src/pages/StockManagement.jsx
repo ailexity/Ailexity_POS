@@ -288,6 +288,13 @@ const StockManagement = () => {
         };
     }, [items]);
 
+    const totalItems = items.length;
+    const totalCurrentStock = useMemo(
+        () => items.reduce((sum, item) => sum + Number(item.currentStock || 0), 0),
+        [items]
+    );
+    const lowStockPercent = totalItems ? Math.round((lowStockItems.length / totalItems) * 100) : 0;
+
     const projectedStock = useMemo(() => {
         if (!txnItem) return 0;
         const quantity = Number(txnForm.quantity || 0);
@@ -397,42 +404,54 @@ const StockManagement = () => {
             </div>
 
             <div className="stock-content">
-                <section className="stock-workflow-panel" aria-label="Stock dashboard workflow">
-                    <div className="stock-workflow-head">
-                        <h2>Stock Dashboard: Usage, Alerts & Trends</h2>
-                        <p>Monitor stock usage, low stock alerts, purchase restocking, and cumulative inventory insights in one place.</p>
-                    </div>
-                    <div className="stock-workflow-grid">
-                        {stockDashboardSteps.map((flow) => (
-                            <article key={flow.step} className="stock-workflow-card">
-                                <span className="stock-workflow-step">Step {flow.step}</span>
-                                <h3>{flow.title}</h3>
-                                <p>{flow.description}</p>
-                                <button type="button" className="stock-workflow-action" onClick={flow.action}>
-                                    {flow.actionLabel}
-                                </button>
-                            </article>
-                        ))}
-                    </div>
-                </section>
-
                 <div className="stock-analytics-grid">
                     <div className="stock-analytics-card">
-                        <p className="stock-analytics-label">Stock Purchased</p>
+                        <p className="stock-analytics-label">Total item types</p>
+                        <p className="stock-analytics-value">{totalItems}</p>
+                        <p className="stock-analytics-sub">Different raw ingredients tracked in inventory.</p>
+                    </div>
+                    <div className="stock-analytics-card accent">
+                        <p className="stock-analytics-label">Current stock total</p>
+                        <p className="stock-analytics-value">{totalCurrentStock.toFixed(2)}</p>
+                        <p className="stock-analytics-sub">Total available quantity across all items.</p>
+                    </div>
+                    <div className="stock-analytics-card">
+                        <p className="stock-analytics-label">Stock purchased</p>
                         <p className="stock-analytics-value">{analytics.purchasedQty.toFixed(2)}</p>
                         <p className="stock-analytics-sub">Value: {formatCurrency(analytics.purchasedValue)}</p>
                     </div>
                     <div className="stock-analytics-card">
-                        <p className="stock-analytics-label">Stock Used</p>
+                        <p className="stock-analytics-label">Stock used</p>
                         <p className="stock-analytics-value">{analytics.usedQty.toFixed(2)}</p>
                         <p className="stock-analytics-sub">Value: {formatCurrency(analytics.usedValue)}</p>
                     </div>
-                    <div className="stock-analytics-card">
-                        <p className="stock-analytics-label">Low Stock Alerts</p>
-                        <p className="stock-analytics-value">{lowStockItems.length}</p>
-                        <p className="stock-analytics-sub">{lowStockItems.length ? 'Needs reorder' : 'All items healthy'}</p>
-                    </div>
                 </div>
+
+                <section className="stock-usage-panel">
+                    <div className="stock-usage-head">
+                        <div>
+                            <h3>Stock health at a glance</h3>
+                            <p>See item counts, low stock pressure, and your most consumed raw materials.</p>
+                        </div>
+                        <span className="stock-usage-summary">{lowStockItems.length} low-stock item{lowStockItems.length === 1 ? '' : 's'} · {lowStockPercent}% of inventory types</span>
+                    </div>
+
+                    <div className="stock-usage-list">
+                        {highUsageItems.length > 0 ? (
+                            highUsageItems.map((item) => (
+                                <div key={item.id} className="stock-usage-item">
+                                    <div>
+                                        <strong>{item.name}</strong>
+                                        <p className="stock-usage-item-sub">Used: {item.usedQty.toFixed(2)} {item.unit}</p>
+                                    </div>
+                                    <div className="stock-usage-value">{item.currentStock.toFixed(2)} {item.unit} left</div>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="stock-history-empty">No usage data yet. Add stock in/out transactions to see insights.</p>
+                        )}
+                    </div>
+                </section>
 
                 {lowStockItems.length > 0 && (
                     <section className="stock-low-alerts">
@@ -478,121 +497,121 @@ const StockManagement = () => {
                                 const exitTxns = txns.filter((txn) => txn.type === 'exit');
 
                                 return (
-                                <React.Fragment key={item.id}>
-                                <tr className={Number(item.currentStock || 0) <= Number(item.reorderLevel || 0) ? 'stock-low-row' : ''}>
-                                    <td data-label="Raw Item">
-                                        <div className="stock-item-name-group">
-                                            <span className="stock-item-name">{item.name}</span>
-                                            <span className="stock-item-sub">Unit: {item.unit}</span>
-                                        </div>
-                                    </td>
-                                    <td data-label="Stock">
-                                        <div className="stock-qty-group">
-                                            <span className={`stock-qty ${item.currentStock <= item.reorderLevel ? 'low' : 'normal'}`}>
-                                                {item.currentStock}
-                                            </span>
-                                            <span className="stock-item-sub">Reorder: {item.reorderLevel}</span>
-                                        </div>
-                                    </td>
-                                    <td data-label="Details">
-                                        <div className="stock-details-cell">
-                                            <span className="stock-detail-count">Vendors: {item.details?.length || 0}</span>
-                                            <span className="stock-item-sub">In: {entryTxns.length} · Out: {exitTxns.length}</span>
-                                            <button
-                                                className="stock-link-btn"
-                                                onClick={() => setExpandedHistoryId((prev) => (prev === item.id ? null : item.id))}
-                                            >
-                                                {expandedHistoryId === item.id ? 'Hide Details' : 'View Details'}
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td data-label="Actions">
-                                        <div className="stock-actions">
-                                            <button className="stock-action-btn entry" onClick={() => openTxn(item.id, 'entry')} title="Stock In">
-                                                <ArrowDownToLine size={15} /> Stock In
-                                            </button>
-                                            <button className="stock-action-btn exit" onClick={() => openTxn(item.id, 'exit')} title="Stock Out">
-                                                <ArrowUpFromLine size={15} /> Stock Out
-                                            </button>
-                                            <button className="stock-icon-btn" onClick={() => openEditModal(item)} title="Edit">
-                                                <Edit size={15} />
-                                            </button>
-                                            <button className="stock-icon-btn delete" onClick={() => handleDelete(item.id)} title="Delete">
-                                                <Trash2 size={15} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-
-                                {expandedHistoryId === item.id && (
-                                    <tr className="stock-history-row">
-                                        <td colSpan="4">
-                                            <div className="stock-history-wrap">
-                                                <div className="stock-history-head">Simple Stock Details · {item.name}</div>
-                                                <div className="stock-details-summary">
-                                                    <span>Unit: {item.unit}</span>
-                                                    <span>Current: {item.currentStock}</span>
-                                                    <span>Reorder Level: {item.reorderLevel}</span>
+                                    <React.Fragment key={item.id}>
+                                        <tr className={Number(item.currentStock || 0) <= Number(item.reorderLevel || 0) ? 'stock-low-row' : ''}>
+                                            <td data-label="Raw Item">
+                                                <div className="stock-item-name-group">
+                                                    <span className="stock-item-name">{item.name}</span>
+                                                    <span className="stock-item-sub">Unit: {item.unit}</span>
                                                 </div>
+                                            </td>
+                                            <td data-label="Stock">
+                                                <div className="stock-qty-group">
+                                                    <span className={`stock-qty ${item.currentStock <= item.reorderLevel ? 'low' : 'normal'}`}>
+                                                        {item.currentStock}
+                                                    </span>
+                                                    <span className="stock-item-sub">Reorder: {item.reorderLevel}</span>
+                                                </div>
+                                            </td>
+                                            <td data-label="Details">
+                                                <div className="stock-details-cell">
+                                                    <span className="stock-detail-count">Vendors: {item.details?.length || 0}</span>
+                                                    <span className="stock-item-sub">In: {entryTxns.length} · Out: {exitTxns.length}</span>
+                                                    <button
+                                                        className="stock-link-btn"
+                                                        onClick={() => setExpandedHistoryId((prev) => (prev === item.id ? null : item.id))}
+                                                    >
+                                                        {expandedHistoryId === item.id ? 'Hide Details' : 'View Details'}
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td data-label="Actions">
+                                                <div className="stock-actions">
+                                                    <button className="stock-action-btn entry" onClick={() => openTxn(item.id, 'entry')} title="Stock In">
+                                                        <ArrowDownToLine size={15} /> Stock In
+                                                    </button>
+                                                    <button className="stock-action-btn exit" onClick={() => openTxn(item.id, 'exit')} title="Stock Out">
+                                                        <ArrowUpFromLine size={15} /> Stock Out
+                                                    </button>
+                                                    <button className="stock-icon-btn" onClick={() => openEditModal(item)} title="Edit">
+                                                        <Edit size={15} />
+                                                    </button>
+                                                    <button className="stock-icon-btn delete" onClick={() => handleDelete(item.id)} title="Delete">
+                                                        <Trash2 size={15} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
 
-                                                {txns.length === 0 ? (
-                                                    <p className="stock-history-empty">No stock movement recorded yet.</p>
-                                                ) : (
-                                                    <div className="stock-history-sections">
-                                                        <div className="stock-history-block">
-                                                            <div className="stock-history-block-head">Stock In</div>
-                                                            {entryTxns.length === 0 ? (
-                                                                <p className="stock-history-empty">No stock in records.</p>
-                                                            ) : (
-                                                                <div className="stock-history-list">
-                                                                    {entryTxns.slice(0, 8).map((txn) => (
-                                                                        <div className="stock-history-item" key={txn.id}>
-                                                                            <div className="stock-history-main">
-                                                                                <span className="stock-history-qty">{txn.quantity} {item.unit}</span>
-                                                                                <span className="stock-history-qty">{formatCurrency(txn.totalPrice)}</span>
-                                                                                <span className="stock-history-date">{formatDateTime(txn.created_at || txn.createdAt)}</span>
-                                                                            </div>
-                                                                            <div className="stock-history-meta single-col">
-                                                                                <span>Unit Price: {formatCurrency(txn.unitPrice)}</span>
-                                                                                <span>Reference: {txn.reference || '—'}</span>
-                                                                                <span>Note: {txn.note || '—'}</span>
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
+                                        {expandedHistoryId === item.id && (
+                                            <tr className="stock-history-row">
+                                                <td colSpan="4">
+                                                    <div className="stock-history-wrap">
+                                                        <div className="stock-history-head">Simple Stock Details · {item.name}</div>
+                                                        <div className="stock-details-summary">
+                                                            <span>Unit: {item.unit}</span>
+                                                            <span>Current: {item.currentStock}</span>
+                                                            <span>Reorder Level: {item.reorderLevel}</span>
                                                         </div>
 
-                                                        <div className="stock-history-block">
-                                                            <div className="stock-history-block-head">Stock Out</div>
-                                                            {exitTxns.length === 0 ? (
-                                                                <p className="stock-history-empty">No stock out records.</p>
-                                                            ) : (
-                                                                <div className="stock-history-list">
-                                                                    {exitTxns.slice(0, 8).map((txn) => (
-                                                                        <div className="stock-history-item" key={txn.id}>
-                                                                            <div className="stock-history-main">
-                                                                                <span className="stock-history-qty">{txn.quantity} {item.unit}</span>
-                                                                                <span className="stock-history-qty">{formatCurrency(txn.totalPrice)}</span>
-                                                                                <span className="stock-history-date">{formatDateTime(txn.created_at || txn.createdAt)}</span>
-                                                                            </div>
-                                                                            <div className="stock-history-meta single-col">
-                                                                                <span>Used In: {txn.usedAt || '—'}</span>
-                                                                                <span>Purpose: {txn.usedFor || '—'}</span>
-                                                                                <span>Note: {txn.note || '—'}</span>
-                                                                            </div>
+                                                        {txns.length === 0 ? (
+                                                            <p className="stock-history-empty">No stock movement recorded yet.</p>
+                                                        ) : (
+                                                            <div className="stock-history-sections">
+                                                                <div className="stock-history-block">
+                                                                    <div className="stock-history-block-head">Stock In</div>
+                                                                    {entryTxns.length === 0 ? (
+                                                                        <p className="stock-history-empty">No stock in records.</p>
+                                                                    ) : (
+                                                                        <div className="stock-history-list">
+                                                                            {entryTxns.slice(0, 8).map((txn) => (
+                                                                                <div className="stock-history-item" key={txn.id}>
+                                                                                    <div className="stock-history-main">
+                                                                                        <span className="stock-history-qty">{txn.quantity} {item.unit}</span>
+                                                                                        <span className="stock-history-qty">{formatCurrency(txn.totalPrice)}</span>
+                                                                                        <span className="stock-history-date">{formatDateTime(txn.created_at || txn.createdAt)}</span>
+                                                                                    </div>
+                                                                                    <div className="stock-history-meta single-col">
+                                                                                        <span>Unit Price: {formatCurrency(txn.unitPrice)}</span>
+                                                                                        <span>Reference: {txn.reference || '—'}</span>
+                                                                                        <span>Note: {txn.note || '—'}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
                                                                         </div>
-                                                                    ))}
+                                                                    )}
                                                                 </div>
-                                                            )}
-                                                        </div>
+
+                                                                <div className="stock-history-block">
+                                                                    <div className="stock-history-block-head">Stock Out</div>
+                                                                    {exitTxns.length === 0 ? (
+                                                                        <p className="stock-history-empty">No stock out records.</p>
+                                                                    ) : (
+                                                                        <div className="stock-history-list">
+                                                                            {exitTxns.slice(0, 8).map((txn) => (
+                                                                                <div className="stock-history-item" key={txn.id}>
+                                                                                    <div className="stock-history-main">
+                                                                                        <span className="stock-history-qty">{txn.quantity} {item.unit}</span>
+                                                                                        <span className="stock-history-qty">{formatCurrency(txn.totalPrice)}</span>
+                                                                                        <span className="stock-history-date">{formatDateTime(txn.created_at || txn.createdAt)}</span>
+                                                                                    </div>
+                                                                                    <div className="stock-history-meta single-col">
+                                                                                        <span>Used In: {txn.usedAt || '—'}</span>
+                                                                                        <span>Purpose: {txn.usedFor || '—'}</span>
+                                                                                        <span>Note: {txn.note || '—'}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                                </React.Fragment>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 );
                             })}
                             {filteredItems.length === 0 && (
