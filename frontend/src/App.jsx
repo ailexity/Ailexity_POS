@@ -149,7 +149,7 @@ const KeyboardShortcuts = () => {
             break;
           case 'k':
             e.preventDefault();
-            if (isRetailer && hasFeature(user, 'stock_management')) navigate('/stock');
+            if (hasFeature(user, 'stock_management')) navigate('/stock');
             break;
           case 'p':
             e.preventDefault();
@@ -233,7 +233,7 @@ function App() {
               <Route path="/history" element={<BusinessTypeRoute allow={['restaurant', 'retailer']} feature="invoices"><History /></BusinessTypeRoute>} />
               <Route path="/orders" element={<BusinessTypeRoute allow={['restaurant']} feature="order_management"><OrderManagement /></BusinessTypeRoute>} />
               <Route path="/kots" element={<BusinessTypeRoute allow={['restaurant']} feature="kot_printing"><KOTManagement /></BusinessTypeRoute>} />
-              <Route path="/stock" element={<BusinessTypeRoute allow={['retailer']} feature="stock_management"><StockManagement /></BusinessTypeRoute>} />
+              <Route path="/stock" element={<BusinessTypeRoute allow={['restaurant','retailer']} feature="stock_management"><StockManagement /></BusinessTypeRoute>} />
               <Route path="/parties" element={<BusinessTypeRoute allow={['retailer']} feature="parties_management"><PartyManagement /></BusinessTypeRoute>} />
               <Route path="/ledger" element={<BusinessTypeRoute allow={['retailer']} feature="ledger_management"><LedgerManagement /></BusinessTypeRoute>} />
               <Route path="/employees" element={<FeatureRoute feature="attendees_management"><EmployeesManagement /></FeatureRoute>} />

@@ -29,6 +29,7 @@ export const getDefaultUserPath = (user) => {
   if (hasFeature(user, 'kot_printing')) return '/kots';
 
   if (businessType === 'restaurant') {
+    if (hasFeature(user, 'stock_management')) return '/stock';
     if (hasFeature(user, 'items_management')) return '/items';
     if (canAccessOrderManagement(user)) return '/orders';
   }

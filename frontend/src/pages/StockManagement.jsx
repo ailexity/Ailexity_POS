@@ -55,6 +55,7 @@ const StockManagement = () => {
     const [expandedHistoryId, setExpandedHistoryId] = useState(null);
     const [form, setForm] = useState(emptyItem);
     const [txnForm, setTxnForm] = useState(emptyTxn);
+    const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
     const fetchItems = async () => {
         try {
@@ -215,11 +216,34 @@ const StockManagement = () => {
             });
     };
 
+    const lowStockItems = useMemo(() => {
+        return items
+            .filter((item) => Number(item.currentStock || 0) <= Number(item.reorderLevel || 0))
+            .sort((a, b) => {
+                const aDiff = Number(a.currentStock || 0) - Number(a.reorderLevel || 0);
+                const bDiff = Number(b.currentStock || 0) - Number(b.reorderLevel || 0);
+                return aDiff - bDiff;
+            });
+    }, [items]);
+
+    const highUsageItems = useMemo(() => {
+        return items
+            .map((item) => {
+                const usedQty = (item.transactions || []).reduce((sum, txn) => {
+                    return txn.type === 'exit' ? sum + Number(txn.quantity || 0) : sum;
+                }, 0);
+                return { ...item, usedQty };
+            })
+            .sort((a, b) => b.usedQty - a.usedQty)
+            .slice(0, 3);
+    }, [items]);
+
     const filteredItems = useMemo(() => {
         const keyword = search.toLowerCase().trim();
-        if (!keyword) return items;
+        const sourceItems = showLowStockOnly ? lowStockItems : items;
+        if (!keyword) return sourceItems;
 
-        return items.filter((item) => {
+        return sourceItems.filter((item) => {
             const inBase = item.name.toLowerCase().includes(keyword) || item.unit.toLowerCase().includes(keyword);
             const inDetails = (item.details || []).some((detail) =>
                 detail.vendor?.toLowerCase().includes(keyword) ||
@@ -234,7 +258,7 @@ const StockManagement = () => {
             );
             return inBase || inDetails || inHistory;
         });
-    }, [items, search]);
+    }, [items, lowStockItems, search, showLowStockOnly]);
 
     const txnItem = items.find((item) => item.id === txnItemId);
     const analytics = useMemo(() => {
@@ -283,46 +307,46 @@ const StockManagement = () => {
         setShowTxnModal(true);
     };
 
-    const retailWorkflowSteps = [
+    const stockDashboardSteps = [
         {
             step: '01',
-            title: 'Add & Manage Inventory',
-            description: 'Add products with price, quantity, and GST details. Stock updates automatically after each transaction.',
-            actionLabel: 'Open Stock',
+            title: 'Inventory Usage Overview',
+            description: 'Track stock purchases, current balances, and material consumption in one cumulative dashboard.',
+            actionLabel: 'View Stock',
             action: () => navigate('/stock')
         },
         {
             step: '02',
-            title: 'Create & Manage Parties',
-            description: 'Maintain customer and supplier records with contact details, GST info, credit limits, and payment terms.',
-            actionLabel: 'Open Parties',
-            action: () => navigate('/parties')
+            title: 'Low Stock Alerts',
+            description: 'See items below reorder level instantly so you can replenish before stockouts occur.',
+            actionLabel: 'Check Alerts',
+            action: () => navigate('/stock')
         },
         {
             step: '03',
-            title: 'Sales / Material Distribution',
-            description: 'Generate invoices for sold or distributed goods. Stock reduces and party ledgers should update instantly.',
-            actionLabel: 'Open Billing',
-            action: () => navigate('/pos')
-        },
-        {
-            step: '04',
-            title: 'Payment Tracking',
-            description: 'Record full or partial payments and monitor pending dues to keep outstanding balances accurate.',
-            actionLabel: 'Open Ledger',
-            action: () => navigate('/ledger')
-        },
-        {
-            step: '05',
-            title: 'Purchase & Restocking',
-            description: 'Add supplier purchases to increase stock automatically and keep supplier payments tracked.',
-            actionLabel: 'Record Stock Entry',
+            title: 'Purchase & Restock',
+            description: 'Record supplier entries to update stock quantities and capture purchase cost data.',
+            actionLabel: 'Add Stock In',
             action: openQuickPurchaseEntry
         },
         {
+            step: '04',
+            title: 'Consumption Insights',
+            description: 'Review how much stock has been used over time and spot high-consumption items.',
+            actionLabel: 'View Usage',
+            action: () => navigate('/stock')
+        },
+        {
+            step: '05',
+            title: 'Batch & Vendor Tracking',
+            description: 'Manage lot details, batch numbers, and supplier sources for traceability.',
+            actionLabel: 'Open Stock',
+            action: () => navigate('/stock')
+        },
+        {
             step: '06',
-            title: 'Monitor via Dashboard',
-            description: 'Review real-time trends, profit movement, and business performance to make better decisions.',
+            title: 'Cumulative Reporting',
+            description: 'Use aggregated stock metrics and alerts to make smarter purchasing decisions.',
             actionLabel: 'Open Dashboard',
             action: () => navigate('/dashboard')
         }
@@ -352,16 +376,34 @@ const StockManagement = () => {
                         onChange={(event) => setSearch(event.target.value)}
                     />
                 </div>
+
+                <div className="stock-header-actions">
+                    <button className="stock-quick-btn" onClick={() => setShowLowStockOnly((prev) => !prev)}>
+                        {showLowStockOnly ? 'Show all stock' : 'Show low stock only'}
+                    </button>
+                    <button className="stock-quick-btn secondary" onClick={openQuickPurchaseEntry}>
+                        Stock In Quick
+                    </button>
+                    <button className="stock-quick-btn secondary" onClick={() => {
+                        if (!items.length) return alert('Add a stock item first.');
+                        setTxnItemId(items[0].id);
+                        setTxnType('exit');
+                        setTxnForm(emptyTxn);
+                        setShowTxnModal(true);
+                    }}>
+                        Stock Out Quick
+                    </button>
+                </div>
             </div>
 
             <div className="stock-content">
-                <section className="stock-workflow-panel" aria-label="Retail ERP workflow">
+                <section className="stock-workflow-panel" aria-label="Stock dashboard workflow">
                     <div className="stock-workflow-head">
-                        <h2>System Workflow (End-to-End)</h2>
-                        <p>Follow this flow for complete retailer operations, from inventory setup to dashboard monitoring.</p>
+                        <h2>Stock Dashboard: Usage, Alerts & Trends</h2>
+                        <p>Monitor stock usage, low stock alerts, purchase restocking, and cumulative inventory insights in one place.</p>
                     </div>
                     <div className="stock-workflow-grid">
-                        {retailWorkflowSteps.map((flow) => (
+                        {stockDashboardSteps.map((flow) => (
                             <article key={flow.step} className="stock-workflow-card">
                                 <span className="stock-workflow-step">Step {flow.step}</span>
                                 <h3>{flow.title}</h3>
@@ -385,7 +427,39 @@ const StockManagement = () => {
                         <p className="stock-analytics-value">{analytics.usedQty.toFixed(2)}</p>
                         <p className="stock-analytics-sub">Value: {formatCurrency(analytics.usedValue)}</p>
                     </div>
+                    <div className="stock-analytics-card">
+                        <p className="stock-analytics-label">Low Stock Alerts</p>
+                        <p className="stock-analytics-value">{lowStockItems.length}</p>
+                        <p className="stock-analytics-sub">{lowStockItems.length ? 'Needs reorder' : 'All items healthy'}</p>
+                    </div>
                 </div>
+
+                {lowStockItems.length > 0 && (
+                    <section className="stock-low-alerts">
+                        <div className="stock-low-alerts-head">
+                            <h3>Low Stock Alerts</h3>
+                            <p>{`You have ${lowStockItems.length} item${lowStockItems.length === 1 ? '' : 's'} at or below reorder level.`}</p>
+                        </div>
+                        <div className="stock-low-alert-list">
+                            {lowStockItems.slice(0, 5).map((item) => (
+                                <div key={item.id} className="stock-low-item">
+                                    <div>
+                                        <strong>{item.name}</strong> · {item.currentStock} {item.unit}
+                                    </div>
+                                    <div>
+                                        <span className="stock-low-badge">Reorder {item.reorderLevel}</span>
+                                        <button className="stock-low-action" onClick={() => openTxn(item.id, 'entry')}>
+                                            Restock
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            {lowStockItems.length > 5 && (
+                                <div className="stock-low-item more">And {lowStockItems.length - 5} more low stock item{lowStockItems.length - 6 ? 's' : ''}...</div>
+                            )}
+                        </div>
+                    </section>
+                )}
 
                 <div className="stock-table-container">
                     <table className="stock-table">
@@ -405,7 +479,7 @@ const StockManagement = () => {
 
                                 return (
                                 <React.Fragment key={item.id}>
-                                <tr>
+                                <tr className={Number(item.currentStock || 0) <= Number(item.reorderLevel || 0) ? 'stock-low-row' : ''}>
                                     <td data-label="Raw Item">
                                         <div className="stock-item-name-group">
                                             <span className="stock-item-name">{item.name}</span>
