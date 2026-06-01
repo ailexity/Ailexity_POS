@@ -99,6 +99,6 @@ const MobileNav = () => {
             </button>
         </nav>
     );
-}};
+};
 
 export default MobileNav;

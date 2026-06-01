@@ -207,43 +207,42 @@ const KOTManagement = () => {
             ) : (
                 <div style={{ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
                     {filteredKots.map((kot) => (
-                        <div key={kot.id} style={{ backgroundColor: 'white', borderRadius: '18px', border: `1px solid ${getStatusColor(kot.status)}33`, boxShadow: '0 15px 45px rgba(15, 23, 42, 0.04)', padding: '18px', minHeight: '220px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                            <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
-                                    <div>
-                                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>KOT #{kot.id?.slice(-6)}</h3>
-                                        <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748b' }}>{kot.table_name ? `${kot.table_name} (${kot.table_number || 'N/A'})` : `Table ${kot.table_number || 'N/A'}`}</p>
-                                    </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '22px' }}>{statusInfo[kot.status]?.emoji || '◯'}</div>
-                                        <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: 700, color: getStatusColor(kot.status) }}>{getStatusLabel(kot.status)}</div>
-                                    </div>
+                        <div key={kot.id} style={{ backgroundColor: 'white', borderRadius: '16px', border: `1px solid ${getStatusColor(kot.status)}22`, boxShadow: '0 12px 28px rgba(15, 23, 42, 0.08)', padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>KOT #{kot.id?.slice(-6)}</h3>
+                                    <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#64748b' }}>{kot.table_name ? `${kot.table_name} (${kot.table_number || 'N/A'})` : `Table ${kot.table_number || 'N/A'}`}</p>
                                 </div>
-
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '16px' }}>
-                                    <span style={{ backgroundColor: '#eff6ff', color: '#0369a1', padding: '6px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 600 }}>Items: {kot.items?.length || 0}</span>
-                                    {kot.notes && <span style={{ backgroundColor: '#f8fafc', color: '#334155', padding: '6px 10px', borderRadius: '999px', fontSize: '12px' }}>{kot.notes}</span>}
-                                </div>
-
-                                <div style={{ marginTop: '18px', backgroundColor: '#f8fafc', borderRadius: '12px', padding: '12px', fontSize: '13px', color: '#334155' }}>
-                                    {kot.items?.map((item, idx) => (
-                                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
-                                            <div>
-                                                <div style={{ fontWeight: 600 }}>{item.item_name || 'Untitled'}</div>
-                                                <div style={{ fontSize: '12px', color: '#64748b' }}>{item.quantity} × ₹{(item.unit_price || 0).toFixed(0)}</div>
-                                            </div>
-                                            <div style={{ fontWeight: 700, color: '#0f172a' }}>₹{(((item.unit_price || 0) * (item.quantity || 1)) || 0).toFixed(0)}</div>
-                                        </div>
-                                    ))}
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '6px 10px', borderRadius: '999px', backgroundColor: `${getStatusColor(kot.status)}22`, color: getStatusColor(kot.status), fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                        {getStatusLabel(kot.status)}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{getTimeSince(kot.created_at)} ago</div>
                                 </div>
                             </div>
 
-                            <div style={{ marginTop: '16px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#64748b' }}>
-                                    <div><Clock3 size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> {getTimeSince(kot.created_at)} ago</div>
+                            <div style={{ display: 'grid', gap: '10px', backgroundColor: '#f8fafc', borderRadius: '12px', padding: '12px', color: '#334155' }}>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                    <span style={{ backgroundColor: '#eff6ff', color: '#0369a1', padding: '6px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>Items: {kot.items?.length || 0}</span>
+                                    {kot.notes && <span style={{ backgroundColor: '#f1f5f9', color: '#334155', padding: '6px 10px', borderRadius: '999px', fontSize: '11px' }}>{kot.notes}</span>}
+                                </div>
+                                {kot.items?.map((item, idx) => (
+                                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'center', padding: '8px 0', borderBottom: idx < kot.items.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
+                                        <div>
+                                            <div style={{ fontWeight: 600, fontSize: '13px' }}>{item.item_name || 'Untitled'}</div>
+                                            <div style={{ fontSize: '11px', color: '#64748b' }}>{item.quantity} × ₹{(item.unit_price || 0).toFixed(0)}</div>
+                                        </div>
+                                        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>₹{(((item.unit_price || 0) * (item.quantity || 1)) || 0).toFixed(0)}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#64748b' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock3 size={14} />{getTimeSince(kot.created_at)} ago</div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <CheckCircle size={14} color="#22c55e" />
-                                        <span style={{ fontWeight: 600 }}>{kot.items?.reduce((sum, item) => sum + (item.quantity || 0), 0)} pcs</span>
+                                        <span style={{ fontWeight: 700 }}>{kot.items?.reduce((sum, item) => sum + (item.quantity || 0), 0)} pcs</span>
                                     </div>
                                 </div>
                                 {renderActions(kot)}

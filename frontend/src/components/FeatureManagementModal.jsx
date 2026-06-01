@@ -44,10 +44,7 @@ const FeatureManagementModal = ({ isOpen, userId, userName, onClose, onSave }) =
     const mergeFeatureSettings = (userFeatures = {}, availableFeatures = {}) => {
         const merged = {};
         Object.keys(availableFeatures).forEach((key) => {
-            merged[key] = userFeatures[key] ?? false;
-        });
-        Object.keys(userFeatures).forEach((key) => {
-            if (!(key in merged)) merged[key] = userFeatures[key];
+            merged[key] = Boolean(userFeatures[key]);
         });
         return merged;
     };

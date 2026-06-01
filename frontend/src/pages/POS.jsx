@@ -38,6 +38,73 @@ const POS = () => {
     const cartPanelRef = useRef(null);
     const isCartOpen = isDesktopView || showCart;
     const businessType = normalizeBusinessType(user?.business_type);
+
+    const KOT_STATUS_LABELS = {
+        pending: 'Pending',
+        preparing: 'Preparing',
+        ready: 'Ready',
+        printed: 'Printed',
+        completed: 'Completed',
+        cancelled: 'Cancelled',
+    };
+
+    const KOT_STATUS_COLORS = {
+        pending: '#f59e0b',
+        preparing: '#f97316',
+        ready: '#22c55e',
+        printed: '#0ea5e9',
+        completed: '#6b7280',
+        cancelled: '#ef4444',
+    };
+
+    const KOT_STATUS_RANK = {
+        cancelled: 0,
+        completed: 0,
+        pending: 1,
+        printed: 2,
+        preparing: 3,
+        ready: 4,
+    };
+
+    const getKotStatusLabel = (status) => KOT_STATUS_LABELS[status] || status || 'Status';
+    const getKotStatusColor = (status) => KOT_STATUS_COLORS[status] || '#94a3b8';
+
+    const fetchKotStatuses = async () => {
+        if (isRetailer) {
+            setKotStatuses({});
+            return;
+        }
+
+        try {
+            const res = await api.get('/kots/');
+            const kotsData = Array.isArray(res.data) ? res.data : [];
+            const statusMap = {};
+
+            kotsData.forEach((kot) => {
+                const tableNumber = kot.table_number;
+                if (tableNumber === undefined || tableNumber === null) return;
+                const key = String(tableNumber);
+                const existing = statusMap[key];
+                const updatedAt = new Date(kot.updated_at || kot.created_at || 0);
+                const rank = KOT_STATUS_RANK[kot.status] ?? 1;
+                const existingRank = existing ? (KOT_STATUS_RANK[existing.status] ?? 1) : -1;
+
+                if (!existing || rank > existingRank || updatedAt > existing.updatedAt) {
+                    statusMap[key] = {
+                        status: kot.status,
+                        label: getKotStatusLabel(kot.status),
+                        color: getKotStatusColor(kot.status),
+                        updatedAt,
+                    };
+                }
+            });
+
+            setKotStatuses(statusMap);
+        } catch (error) {
+            console.error('Failed to fetch KOT statuses:', error);
+            setKotStatuses({});
+        }
+    };
     const isRetailer = businessType === 'retailer';
     const isAttendee = user?.role === 'attendee';
     const retailBillingTable = useMemo(() => ({
@@ -150,6 +217,12 @@ const POS = () => {
             }
         };
         fetchParties();
+    }, [isRetailer]);
+
+    useEffect(() => {
+        fetchKotStatuses();
+        const kotStatusInterval = setInterval(fetchKotStatuses, 10000);
+        return () => clearInterval(kotStatusInterval);
     }, [isRetailer]);
 
     useEffect(() => {
@@ -336,6 +409,7 @@ const POS = () => {
                 await api.post('/kots/', payload);
                 alert('Order sent to KOT display');
                 setShowKOTOptions(false);
+                fetchKotStatuses();
             } catch (e) {
                 console.error('KOT send error', e);
                 let msg = 'Failed to send order to KOT display';
@@ -471,6 +545,9 @@ const POS = () => {
                                 <div className="table-grid">
                                     {tables.map(table => {
                                         const hasOrders = tableCarts[table.id] && tableCarts[table.id].length > 0;
+                                        const tableStatus = kotStatuses[String(table.table_number)];
+                                        const hasActiveKot = tableStatus && ['pending', 'preparing', 'ready', 'printed'].includes(tableStatus.status);
+                                        const statusText = tableStatus?.label || (hasOrders ? 'Occupied' : 'Available');
                                         return (
                                             <button
                                                 key={table.id}
@@ -478,13 +555,22 @@ const POS = () => {
                                                     selectTable(table);
                                                     setShowTableSelector(false);
                                                 }}
-                                                className={`table-btn ${selectedTable?.id === table.id ? 'selected' : ''} ${hasOrders ? 'has-orders' : ''}`}
+                                                className={`table-btn ${selectedTable?.id === table.id ? 'selected' : ''} ${hasOrders ? 'has-orders' : ''} ${hasActiveKot ? 'has-kot' : ''}`}
                                             >
-                                                {hasOrders && <span className="table-badge" title="Has ongoing orders" />}
+                                                {hasActiveKot && (
+                                                    <span
+                                                        className="table-badge"
+                                                        title={`KOT ${statusText}`}
+                                                        style={{
+                                                            backgroundColor: tableStatus.color,
+                                                            boxShadow: `0 0 0 3px ${tableStatus.color}22`,
+                                                        }}
+                                                    />
+                                                )}
                                                 <div className="table-name">{table.table_name}</div>
                                                 <div className="table-details">#{table.table_number}</div>
                                                 <div className="table-details">{table.capacity} seats</div>
-                                                {hasOrders && <div className="table-status">Occupied</div>}
+                                                <div className={`table-status ${tableStatus ? `kot-${tableStatus.status}` : ''}`}>{statusText}</div>
                                             </button>
                                         );
                                     })}
@@ -733,12 +819,6 @@ const POS = () => {
                         </div>
                     )}
 
-                    {/* Complete Order Button */}
-                    {isAttendee && (
-                        <div className="mb-4 p-4 rounded-lg" style={{ background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e' }}>
-                            Attendee access is limited: you can add items to the POS cart, and send orders to the kitchen display. Only admins can print to a Bluetooth KOT printer or complete invoices.
-                        </div>
-                    )}
                     <div className="cart-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <button
                             type="button"
@@ -811,8 +891,7 @@ const POS = () => {
                     setAutoPrintKOT(false);
                 }}
                 onSuccess={() => {
-                    // Optional: Clear cart after successful KOT print
-                    // clearCart();
+                    fetchKotStatuses();
                 }}
             />
         </div>

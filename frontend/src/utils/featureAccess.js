@@ -14,9 +14,7 @@ export const canAccessOrderManagement = (user) => hasFeature(user, 'order_manage
 
 export const isLimitedRoleUser = (user) => {
   if (!user || user.role === 'sysadmin') return false;
-  // KOT users and attendees have only one feature enabled
-  const enabledFeatures = Object.values(user.features || {}).filter(v => v === true).length;
-  return enabledFeatures <= 1;
+  return user.role === 'kitchen' || user.role === 'attendee';
 };
 
 export const getDefaultUserPath = (user) => {

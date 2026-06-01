@@ -29,6 +29,25 @@ def _normalize_business_type(value: Optional[str]) -> Optional[str]:
         return "restaurant"
     return None
 
+def _validate_tenant_feature_login(user: dict, db: Database):
+    if user.get("role") not in ["attendee", "kitchen"]:
+        return
+
+    admin_id = user.get("admin_id")
+    if not admin_id or not ObjectId.is_valid(admin_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unable to verify tenant admin permissions.")
+
+    admin = db.users_collection.find_one({"_id": ObjectId(admin_id)})
+    if not admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant admin account not found.")
+
+    features = admin.get("features", {})
+    if user.get("role") == "kitchen" and not features.get("kot_printing", True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Kitchen user login is disabled by the admin.")
+    if user.get("role") == "attendee" and not features.get("attendees_management", True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Attendee login is disabled by the admin.")
+
+
 @router.post("/token", response_model=schemas.Token, summary="Login (OAuth2)")
 async def login_for_access_token(
     username: str = Form(...),
@@ -44,6 +63,8 @@ async def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    _validate_tenant_feature_login(user, db)
     # If admin role, require email verification
     if user.get("role") == "admin" and not user.get("is_verified"):
         raise HTTPException(status_code=403, detail="Admin account not verified. Please verify the email OTP before logging in.")
@@ -92,6 +113,9 @@ async def google_login(data: schemas.GoogleLogin, db: Database = Depends(databas
     user = database.users_collection.find_one({"$or": [{"email": data.email}, {"google_id": data.google_id}]})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    _validate_tenant_feature_login(user, db)
+
     if user.get("role") == "admin" and not user.get("is_verified"):
         raise HTTPException(status_code=403, detail="Admin account not verified via email OTP")
 
@@ -729,11 +753,6 @@ async def get_all_available_features(
             "name": "Dashboard",
             "description": "Access to analytics dashboard",
             "icon": "BarChart3"
-        },
-        "admin_panel": {
-            "name": "Admin Settings",
-            "description": "Access to admin settings",
-            "icon": "Settings"
         },
         "kot_printing": {
             "name": "KOT Printing",

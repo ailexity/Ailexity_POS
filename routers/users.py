@@ -26,6 +26,25 @@ def _normalize_business_type(value: Optional[str]) -> Optional[str]:
         return "restaurant"
     return None
 
+def _validate_tenant_feature_login(user: dict, db: Database):
+    if user.get("role") not in ["attendee", "kitchen"]:
+        return
+
+    admin_id = user.get("admin_id")
+    if not admin_id or not ObjectId.is_valid(admin_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unable to verify tenant admin permissions.")
+
+    admin = db.users_collection.find_one({"_id": ObjectId(admin_id)})
+    if not admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant admin account not found.")
+
+    features = admin.get("features", {})
+    if user.get("role") == "kitchen" and not features.get("kot_printing", True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Kitchen user login is disabled by the admin.")
+    if user.get("role") == "attendee" and not features.get("attendees_management", True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Attendee login is disabled by the admin.")
+
+
 @router.post("/token", response_model=schemas.Token, summary="Login (OAuth2)")
 async def login_for_access_token(
     username: str = Form(...),
@@ -40,6 +59,8 @@ async def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    _validate_tenant_feature_login(user, db)
     
     if user.get("subscription_status") == 'inactive':
         raise HTTPException(
@@ -318,7 +339,6 @@ async def get_all_available_features(current_user: dict = Depends(auth.get_admin
         "invoices": {"name": "Invoices", "description": "View and manage invoices", "icon": "FileText"},
         "alerts": {"name": "Alerts Management", "description": "Configure and manage alerts", "icon": "Bell"},
         "dashboard": {"name": "Dashboard", "description": "Access to analytics dashboard", "icon": "BarChart3"},
-        "admin_panel": {"name": "Admin Settings", "description": "Access to admin settings", "icon": "Settings"},
         "kot_printing": {"name": "KOT Printing", "description": "Kitchen Order Ticket printing functionality", "icon": "Printer"},
         "order_management": {"name": "Order Management", "description": "Manage and track orders", "icon": "ClipboardList"},
         "payment_tracking": {"name": "Payment Tracking", "description": "Track payments and transactions", "icon": "DollarSign"},

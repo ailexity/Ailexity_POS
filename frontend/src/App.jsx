@@ -26,7 +26,7 @@ import LedgerManagement from './pages/LedgerManagement';
 import EmployeesManagement from './pages/EmployeesManagement';
 import { Lock } from 'lucide-react';
 import './index.css';
-import { canAccessOrderManagement, getDefaultUserPath, hasFeature, normalizeBusinessType } from './utils/featureAccess';
+import { canAccessOrderManagement, getDefaultUserPath, hasFeature, normalizeBusinessType, isLimitedRoleUser } from './utils/featureAccess';
 
 const AccessDisabled = () => (
   <div className="page-container with-mobile-header-offset">
@@ -69,6 +69,14 @@ const FeatureRoute = ({ feature, children }) => {
 
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'sysadmin') return <Navigate to="/system" replace />;
+
+  if (feature === 'admin_panel') {
+    if (isLimitedRoleUser(user)) {
+      return <Navigate to={getDefaultUserPath(user)} replace />;
+    }
+    return children;
+  }
+
   if (!hasFeature(user, feature)) {
     return <AccessDisabled />;
   }

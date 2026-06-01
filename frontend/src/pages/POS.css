@@ -262,6 +262,32 @@
     background: rgba(16, 138, 133, 0.08);
 }
 
+.table-btn.has-kot {
+    border-color: rgba(59, 130, 246, 0.35);
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.table-status.kot-pending {
+    color: #92400e;
+}
+
+.table-status.kot-preparing {
+    color: #c2410c;
+}
+
+.table-status.kot-ready {
+    color: #166534;
+}
+
+.table-status.kot-printed {
+    color: #0c4a6e;
+}
+
+.table-status.kot-completed,
+.table-status.kot-cancelled {
+    color: #475569;
+}
+
 .table-btn.has-orders .table-status {
     color: #047857;
 }
@@ -547,8 +573,8 @@
 /* Cart Panel */
 .pos-cart-panel {
     box-sizing: border-box;
-    width: min(100%, 380px);
-    max-width: 380px;
+    width: min(100%, 420px);
+    max-width: 420px;
     background: #ffffff;
     border-left: 1px solid rgba(226, 232, 240, 0.9);
     display: flex;
@@ -562,7 +588,7 @@
 @media (min-width: 1024px) {
     .pos-container {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+        grid-template-columns: minmax(0, 1fr) 420px;
         grid-template-rows: auto 1fr;
         grid-template-areas:
             "header cart"
@@ -573,7 +599,7 @@
     .pos-cart-panel {
         grid-area: cart;
         width: 100%;
-        max-width: 380px;
+        max-width: 420px;
         min-width: 300px;
     }
 }
@@ -1092,6 +1118,15 @@
 
     .pos-search-wrapper {
         display: none;
+    }
+
+    .cart-actions .btn {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .btn-icon {
+        min-width: 0;
     }
 }
 
