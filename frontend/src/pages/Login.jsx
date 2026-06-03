@@ -24,6 +24,8 @@ const Login = () => {
     const [requestSubmitting, setRequestSubmitting] = useState(false);
     const [requestSuccess, setRequestSuccess] = useState(false);
 
+    const isExpired = new URLSearchParams(window.location.search).get('expired') === '1';
+
     useEffect(() => {
         const storedRememberMe = localStorage.getItem('remember_me');
         if (storedRememberMe === 'false') {
@@ -146,6 +148,13 @@ const Login = () => {
                                 Forgot password?
                             </button>
                         </div>
+
+                        {isExpired && !error && (
+                            <div className="error-message" style={{ background: '#fef3c7', borderColor: '#fcd34d', color: '#92400e' }}>
+                                <AlertCircle size={16} />
+                                Your session expired. Please log in again.
+                            </div>
+                        )}
 
                         {error && (
                             <div className="error-message">

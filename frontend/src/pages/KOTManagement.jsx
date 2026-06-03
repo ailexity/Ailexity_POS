@@ -231,6 +231,9 @@ const KOTManagement = () => {
                                         <div>
                                             <div style={{ fontWeight: 600, fontSize: '13px' }}>{item.item_name || 'Untitled'}</div>
                                             <div style={{ fontSize: '11px', color: '#64748b' }}>{item.quantity} × ₹{(item.unit_price || 0).toFixed(0)}</div>
+                                            {item.notes && (
+                                                <div style={{ fontSize: '11px', color: '#f97316', marginTop: 2, fontStyle: 'italic' }}>✏ {item.notes}</div>
+                                            )}
                                         </div>
                                         <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>₹{(((item.unit_price || 0) * (item.quantity || 1)) || 0).toFixed(0)}</div>
                                     </div>

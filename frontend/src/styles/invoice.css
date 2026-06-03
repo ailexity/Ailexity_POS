@@ -27,6 +27,13 @@
     box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
 }
 
+/* New unified invoice page class used by both templates */
+.inv-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+
 .invoice-professional-header {
     background: #ffffff;
     border-bottom: 1px solid #e5e7eb;

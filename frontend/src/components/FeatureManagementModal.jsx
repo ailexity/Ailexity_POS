@@ -2,369 +2,248 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { Check, X, AlertCircle, Settings } from 'lucide-react';
 
-const FeatureManagementModal = ({ isOpen, userId, userName, onClose, onSave }) => {
-    const [features, setFeatures] = useState({});
-    const [allFeatures, setAllFeatures] = useState({});
-    const [loading, setLoading] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
+const FEATURE_GROUPS = {
+  common: {
+    label: 'Core Features',
+    keys: ['pos_billing', 'invoices', 'dashboard', 'stock_management', 'payment_tracking', 'alerts', 'admin_panel', 'attendees_management'],
+  },
+  restaurant: {
+    label: 'Restaurant Only',
+    keys: ['items_management', 'kot_printing', 'order_management'],
+  },
+  retailer: {
+    label: 'Retailer Only',
+    keys: ['parties_management', 'ledger_management'],
+  },
+};
 
-    useEffect(() => {
-        if (isOpen && userId) {
-            fetchUserFeatures();
-            fetchAvailableFeatures();
-        }
-    }, [isOpen, userId]);
+const Toggle = ({ checked, onChange, disabled }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    onClick={() => !disabled && onChange(!checked)}
+    disabled={disabled}
+    style={{
+      position: 'relative',
+      display: 'inline-flex',
+      flexShrink: 0,
+      width: '44px',
+      height: '24px',
+      borderRadius: '9999px',
+      border: '2px solid transparent',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      transition: 'background-color 0.2s',
+      backgroundColor: checked ? '#3b82f6' : '#d1d5db',
+      outline: 'none',
+    }}
+  >
+    <span
+      style={{
+        display: 'inline-block',
+        width: '16px',
+        height: '16px',
+        borderRadius: '9999px',
+        backgroundColor: 'white',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+        transition: 'transform 0.2s',
+        transform: checked ? 'translateX(20px)' : 'translateX(0px)',
+        marginTop: '2px',
+        marginLeft: '2px',
+      }}
+    />
+  </button>
+);
 
-    const fetchUserFeatures = async () => {
-        setLoading(true);
-        setError('');
-        try {
-            const response = await api.get(`/users/${userId}/features`);
-            setFeatures(mergeFeatureSettings(response.data.features || {}, allFeatures));
-        } catch (err) {
-            setError(err.response?.data?.detail || 'Failed to load user features');
-        } finally {
-            setLoading(false);
-        }
-    };
+const FeatureManagementModal = ({ isOpen, userId, userName, userBusinessType, onClose, onSave }) => {
+  const [features, setFeatures] = useState({});
+  const [allFeatures, setAllFeatures] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [businessType, setBusinessType] = useState(userBusinessType || '');
 
-    const fetchAvailableFeatures = async () => {
-        try {
-            const response = await api.get('/admin/features-list');
-            const available = response.data.available_features || {};
-            setAllFeatures(available);
-            setFeatures(prev => mergeFeatureSettings(prev, available));
-        } catch (err) {
-            console.error('Failed to load available features:', err);
-        }
-    };
+  useEffect(() => {
+    if (isOpen && userId) {
+      fetchData();
+    }
+  }, [isOpen, userId]);
 
-    const mergeFeatureSettings = (userFeatures = {}, availableFeatures = {}) => {
-        const merged = {};
-        Object.keys(availableFeatures).forEach((key) => {
-            merged[key] = Boolean(userFeatures[key]);
-        });
-        return merged;
-    };
+  const fetchData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.get(`/users/${userId}/features`);
+      setAllFeatures(res.data.available_features || {});
+      setBusinessType(res.data.business_type || userBusinessType || '');
+      const merged = {};
+      Object.keys(res.data.available_features || {}).forEach((k) => {
+        merged[k] = Boolean((res.data.features || {})[k]);
+      });
+      setFeatures(merged);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to load features');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleToggleFeature = (featureKey) => {
-        setFeatures(prev => ({
-            ...prev,
-            [featureKey]: !prev[featureKey]
-        }));
-        setSuccess('');
-    };
+  const handleToggle = (key) => {
+    setFeatures((prev) => ({ ...prev, [key]: !prev[key] }));
+    setSuccess('');
+  };
 
-    const handleSave = async () => {
-        setSaving(true);
-        setError('');
-        setSuccess('');
-        try {
-            await api.put(`/users/${userId}/features`, features);
-            setSuccess('Features updated successfully!');
-            if (onSave) onSave();
-            setTimeout(() => {
-                onClose();
-            }, 1500);
-        } catch (err) {
-            setError(err.response?.data?.detail || 'Failed to update features');
-        } finally {
-            setSaving(false);
-        }
-    };
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await api.put(`/users/${userId}/features`, features);
+      setSuccess('Features updated successfully!');
+      if (onSave) onSave();
+      setTimeout(onClose, 1200);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to update features');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    const handleEnableAll = () => {
-        const allEnabled = Object.keys(allFeatures).reduce((acc, key) => {
-            acc[key] = true;
-            return acc;
-        }, {});
-        setFeatures(allEnabled);
-    };
+  const setGroup = (keys, value) => {
+    setFeatures((prev) => {
+      const next = { ...prev };
+      keys.forEach((k) => { next[k] = value; });
+      return next;
+    });
+    setSuccess('');
+  };
 
-    const handleDisableAll = () => {
-        const allDisabled = Object.keys(allFeatures).reduce((acc, key) => {
-            acc[key] = false;
-            return acc;
-        }, {});
-        setFeatures(allDisabled);
-    };
+  const normalizedBT = String(businessType || '').toLowerCase().includes('retail') ? 'retailer' : 'restaurant';
 
-    if (!isOpen) return null;
+  const visibleGroups = [
+    FEATURE_GROUPS.common,
+    normalizedBT === 'restaurant' ? FEATURE_GROUPS.restaurant : FEATURE_GROUPS.retailer,
+  ];
 
-    const enabledCount = Object.values(features).filter(v => v).length;
-    const totalCount = Object.keys(features).length;
+  const enabledCount = Object.values(features).filter(Boolean).length;
+  const totalCount = Object.keys(features).length;
 
-    return (
+  if (!isOpen) return null;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000, padding: '20px', backdropFilter: 'blur(4px)',
+    }}>
+      <div style={{
+        background: 'white', borderRadius: '12px', width: '100%', maxWidth: '520px',
+        maxHeight: '90vh', overflow: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+      }}>
+        {/* Header */}
         <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-            backdropFilter: 'blur(4px)'
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '20px 24px 16px', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, background: 'white', zIndex: 1,
         }}>
-            <div style={{
-                background: 'white',
-                borderRadius: '8px',
-                padding: '24px',
-                maxWidth: '500px',
-                width: '100%',
-                maxHeight: '80vh',
-                overflow: 'auto',
-                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
-            }}>
-                {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '20px',
-                    paddingBottom: '16px',
-                    borderBottom: '1px solid #e2e8f0'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Settings size={24} style={{ color: '#3b82f6' }} />
-                        <div>
-                            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>
-                                Manage Features
-                            </h2>
-                            <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
-                                {userName}
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '24px',
-                            color: '#94a3b8'
-                        }}
-                    >
-                        ×
-                    </button>
-                </div>
-
-                {/* Status Summary */}
-                <div style={{
-                    background: '#f8fafc',
-                    padding: '12px',
-                    borderRadius: '6px',
-                    marginBottom: '16px',
-                    fontSize: '14px',
-                    color: '#475569'
-                }}>
-                    Enabled: <strong>{enabledCount}/{totalCount}</strong> features
-                </div>
-
-                {/* Error Message */}
-                {error && (
-                    <div style={{
-                        background: '#fef2f2',
-                        border: '1px solid #fca5a5',
-                        borderRadius: '6px',
-                        padding: '12px',
-                        marginBottom: '16px',
-                        display: 'flex',
-                        gap: '8px',
-                        alignItems: 'flex-start',
-                        fontSize: '13px',
-                        color: '#dc2626'
-                    }}>
-                        <AlertCircle size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
-                        <div>{error}</div>
-                    </div>
-                )}
-
-                {/* Success Message */}
-                {success && (
-                    <div style={{
-                        background: '#f0fdf4',
-                        border: '1px solid #86efac',
-                        borderRadius: '6px',
-                        padding: '12px',
-                        marginBottom: '16px',
-                        display: 'flex',
-                        gap: '8px',
-                        alignItems: 'flex-start',
-                        fontSize: '13px',
-                        color: '#16a34a'
-                    }}>
-                        <Check size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
-                        <div>{success}</div>
-                    </div>
-                )}
-
-                {/* Features List */}
-                <div style={{ marginBottom: '16px' }}>
-                    {loading ? (
-                        <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>
-                            Loading features...
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {(Object.keys(allFeatures).length ? Object.entries(allFeatures) : Object.entries(features)).map(([key, featureInfoOrEnabled]) => {
-                                const enabled = Boolean(features[key]);
-                                const featureInfo = allFeatures[key] || { name: key, description: '' };
-                                return (
-                                    <label key={key} style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        padding: '12px',
-                                        border: '1px solid #e2e8f0',
-                                        borderRadius: '6px',
-                                        cursor: 'pointer',
-                                        background: enabled ? '#f0f9ff' : 'white',
-                                        transition: 'all 0.2s'
-                                    }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={enabled}
-                                            onChange={() => handleToggleFeature(key)}
-                                            style={{
-                                                marginRight: '12px',
-                                                width: '18px',
-                                                height: '18px',
-                                                cursor: 'pointer'
-                                            }}
-                                        />
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{
-                                                fontWeight: 600,
-                                                fontSize: '14px',
-                                                color: '#1e293b',
-                                                marginBottom: '2px'
-                                            }}>
-                                                {featureInfo.name}
-                                            </div>
-                                            <div style={{
-                                                fontSize: '12px',
-                                                color: '#64748b'
-                                            }}>
-                                                {featureInfo.description}
-                                            </div>
-                                        </div>
-                                        <div style={{
-                                            width: '24px',
-                                            height: '24px',
-                                            borderRadius: '4px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            background: enabled ? '#10b981' : '#e2e8f0',
-                                            color: enabled ? 'white' : '#94a3b8',
-                                            fontSize: '14px'
-                                        }}>
-                                            {enabled ? <Check size={16} /> : <X size={16} />}
-                                        </div>
-                                    </label>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                {/* Quick Actions */}
-                {!loading && (
-                    <div style={{
-                        display: 'flex',
-                        gap: '8px',
-                        marginBottom: '16px',
-                        paddingTop: '12px',
-                        borderTop: '1px solid #e2e8f0'
-                    }}>
-                        <button
-                            onClick={handleEnableAll}
-                            style={{
-                                flex: 1,
-                                padding: '8px 12px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '4px',
-                                background: 'white',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                color: '#3b82f6'
-                            }}
-                        >
-                            Enable All
-                        </button>
-                        <button
-                            onClick={handleDisableAll}
-                            style={{
-                                flex: 1,
-                                padding: '8px 12px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '4px',
-                                background: 'white',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                color: '#64748b'
-                            }}
-                        >
-                            Disable All
-                        </button>
-                    </div>
-                )}
-
-                {/* Action Buttons */}
-                <div style={{
-                    display: 'flex',
-                    gap: '8px',
-                    paddingTop: '16px',
-                    borderTop: '1px solid #e2e8f0'
-                }}>
-                    <button
-                        onClick={onClose}
-                        disabled={saving || loading}
-                        style={{
-                            flex: 1,
-                            padding: '10px 16px',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '6px',
-                            background: 'white',
-                            cursor: saving || loading ? 'not-allowed' : 'pointer',
-                            fontSize: '14px',
-                            fontWeight: 600,
-                            color: '#64748b',
-                            opacity: saving || loading ? 0.6 : 1
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={saving || loading}
-                        style={{
-                            flex: 1,
-                            padding: '10px 16px',
-                            border: 'none',
-                            borderRadius: '6px',
-                            background: '#3b82f6',
-                            cursor: saving || loading ? 'not-allowed' : 'pointer',
-                            fontSize: '14px',
-                            fontWeight: 600,
-                            color: 'white',
-                            opacity: saving || loading ? 0.7 : 1
-                        }}
-                    >
-                        {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
-                </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Settings size={18} color="#3b82f6" />
             </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Manage Features</h2>
+              <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>{userName} · {enabledCount}/{totalCount} enabled</p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}>
+            <X size={20} />
+          </button>
         </div>
-    );
+
+        <div style={{ padding: '16px 24px 24px' }}>
+          {error && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', padding: '10px 12px', marginBottom: '14px', display: 'flex', gap: '8px', fontSize: '13px', color: '#dc2626' }}>
+              <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} /> {error}
+            </div>
+          )}
+          {success && (
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', padding: '10px 12px', marginBottom: '14px', display: 'flex', gap: '8px', fontSize: '13px', color: '#16a34a' }}>
+              <Check size={15} style={{ flexShrink: 0, marginTop: '1px' }} /> {success}
+            </div>
+          )}
+
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '14px' }}>Loading features…</div>
+          ) : (
+            visibleGroups.map((group) => {
+              const groupKeys = group.keys.filter((k) => k in allFeatures);
+              if (groupKeys.length === 0) return null;
+              const allOn = groupKeys.every((k) => features[k]);
+              return (
+                <div key={group.label} style={{ marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' }}>{group.label}</span>
+                    <button
+                      type="button"
+                      onClick={() => setGroup(groupKeys, !allOn)}
+                      style={{ fontSize: '11px', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      {allOn ? 'Disable all' : 'Enable all'}
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {groupKeys.map((key) => {
+                      const info = allFeatures[key] || { name: key, description: '' };
+                      const enabled = Boolean(features[key]);
+                      return (
+                        <div
+                          key={key}
+                          onClick={() => handleToggle(key)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '12px',
+                            padding: '10px 12px', borderRadius: '8px', cursor: 'pointer',
+                            border: `1px solid ${enabled ? '#bfdbfe' : '#e2e8f0'}`,
+                            background: enabled ? '#f0f9ff' : '#fafafa',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <Toggle checked={enabled} onChange={() => handleToggle(key)} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>{info.name}</div>
+                            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '1px' }}>{info.description}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          {/* Actions */}
+          {!loading && (
+            <div style={{ display: 'flex', gap: '8px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', marginTop: '4px' }}>
+              <button
+                onClick={onClose}
+                disabled={saving}
+                style={{ flex: 1, padding: '10px', border: '1px solid #e2e8f0', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#64748b' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                style={{ flex: 2, padding: '10px', border: 'none', borderRadius: '8px', background: '#3b82f6', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 600, color: 'white', opacity: saving ? 0.7 : 1 }}
+              >
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default FeatureManagementModal;

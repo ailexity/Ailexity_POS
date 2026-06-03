@@ -37,7 +37,8 @@ const AdminManagement = () => {
         tax_rate: '',
         subscription_status: 'active',
         active_window_start: '',
-        active_window_end: ''
+        active_window_end: '',
+        whatsapp_from_display: '',
     });
 
     const getKitchenUserFeatures = () => ({
@@ -145,7 +146,8 @@ const AdminManagement = () => {
                 tax_rate: '',
                 subscription_status: 'active',
                 active_window_start: '',
-                active_window_end: ''
+                active_window_end: '',
+                whatsapp_from_display: '',
             });
             fetchUsers();
         } catch (err) {
@@ -185,7 +187,8 @@ const AdminManagement = () => {
                 tax_rate: '',
                 subscription_status: 'active',
                 active_window_start: '',
-                active_window_end: ''
+                active_window_end: '',
+                whatsapp_from_display: '',
             });
             fetchUsers();
         } catch (err) {
@@ -256,7 +259,8 @@ const AdminManagement = () => {
             tax_rate: user.tax_rate || 0,
             subscription_status: user.subscription_status || 'active',
             active_window_start: user.active_window_start || '',
-            active_window_end: user.active_window_end || ''
+            active_window_end: user.active_window_end || '',
+            whatsapp_from_display: user.whatsapp_from_display || '',
         });
         setShowEditModal(true);
         setError('');
@@ -373,8 +377,8 @@ const AdminManagement = () => {
                     <div className="card">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-muted mb-2">Kitchen Staff</p>
-                                <h2 className="text-2xl font-bold">{users.filter(u => u.role === 'kitchen').length}</h2>
+                                <p className="text-sm text-muted mb-2">Active Admins</p>
+                                <h2 className="text-2xl font-bold">{users.filter(u => u.role === 'admin' && u.subscription_status === 'active').length}</h2>
                             </div>
                             <div className="p-3" style={{ background: '#d1fae5' }}>
                                 <CheckCircle size={24} color="#16a34a" />
@@ -419,137 +423,126 @@ const AdminManagement = () => {
                         <table className="table">
                             <thead>
                                 <tr>
-                                            <th>ID</th>
                                     <th>Username</th>
-                                    <th>Business Name</th>
+                                    <th>Business</th>
                                     <th>Role</th>
                                     <th>Subscription</th>
                                     <th>Features</th>
                                     <th>Verification</th>
                                     <th>Status</th>
+                                    <th>Last Login</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {users.filter(u => {
-                                    if (!searchQuery) return true; // Show all if no search query
-                                    const query = searchQuery.toLowerCase();
-                                    return (
-                                        (u.username && u.username.toLowerCase().includes(query)) ||
-                                        (u.business_name && u.business_name.toLowerCase().includes(query)) ||
-                                        (u.email && u.email.toLowerCase().includes(query)) ||
-                                        (u.phone && u.phone.toLowerCase().includes(query)) ||
-                                        (u.id && u.id.toString().includes(query)) ||
-                                        (u.role && u.role.toLowerCase().includes(query))
-                                    );
-                                }).map(u => (
-                                    <tr key={u.id}>
-                                        <td>{u.id}</td>
-                                        <td className="font-medium">
-                                            {u.username}
-                                            <div className="text-xs text-muted">{u.phone || ''}</div>
-                                        </td>
-                                        <td>{u.business_name || '-'}</td>
-                                        <td>
-                                            <span className={`badge ${u.role === 'admin' ? 'bg-blue-500' : u.role === 'sysadmin' ? 'bg-purple-500' : 'bg-emerald-500'}`}>
-                                                {u.role === 'admin' ? 'Admin' : u.role === 'sysadmin' ? 'System Admin' : u.role === 'kitchen' ? 'Kitchen' : u.role}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span className={`badge ${u.subscription_status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}>
-                                                {u.subscription_status || 'active'}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {u.features ? (
-                                                <span className="badge bg-slate-500 text-white">
-                                                    {Object.values(u.features).filter(Boolean).length}/{Object.keys(u.features).length}
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs text-muted">No features</span>
-                                            )}
-                                        </td>
-                                        <td>
-                                            {u.role === 'admin' ? (
-                                                <span className={`badge ${u.is_verified ? 'bg-green-500' : 'bg-yellow-500'}`}>
-                                                    {u.is_verified ? 'Verified' : 'Pending'}
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs text-muted">Not required</span>
-                                            )}
-                                        </td>
-                                        <td>
-                                            {(() => {
-                                                const accessStatus = getAccessStatus(u);
-                                                return (
-                                                    <span className={`badge ${accessStatus.color}`} title={
-                                                        u.active_window_start || u.active_window_end 
-                                                            ? `Access: ${u.active_window_start || 'No start'} to ${u.active_window_end || 'No end'}`
-                                                            : 'Unlimited access'
-                                                    }>
-                                                        {accessStatus.label}
+                                {(() => {
+                                    const filtered = users.filter(u => {
+                                        if (!searchQuery) return true;
+                                        const q = searchQuery.toLowerCase();
+                                        return (
+                                            (u.username && u.username.toLowerCase().includes(q)) ||
+                                            (u.business_name && u.business_name.toLowerCase().includes(q)) ||
+                                            (u.email && u.email.toLowerCase().includes(q)) ||
+                                            (u.phone && u.phone.toLowerCase().includes(q)) ||
+                                            (u.role && u.role.toLowerCase().includes(q))
+                                        );
+                                    });
+                                    if (filtered.length === 0) {
+                                        return (
+                                            <tr>
+                                                <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                                        <Search size={32} style={{ opacity: 0.3 }} />
+                                                        <p>{searchQuery ? `No users found matching "${searchQuery}"` : 'No users found'}</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
+                                    return filtered.map(u => (
+                                        <tr key={u.id}>
+                                            <td className="font-medium">
+                                                {u.username}
+                                                <div className="text-xs text-muted">{u.phone || ''}</div>
+                                            </td>
+                                            <td>
+                                                <div>{u.business_name || <span className="text-xs text-muted">—</span>}</div>
+                                                {u.business_type && (
+                                                    <span className={`badge text-xs ${u.business_type === 'retailer' ? 'bg-orange-400' : 'bg-sky-500'}`} style={{ marginTop: '3px' }}>
+                                                        {u.business_type}
                                                     </span>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td>
-                                            <div className="flex gap-2">
-                                                {u.role === 'admin' && !u.is_verified && (
-                                                    <button
-                                                        className="btn-icon success"
-                                                        onClick={() => handleVerifyUser(u.id)}
-                                                        title="Mark admin as verified"
-                                                    >
-                                                        <CheckCircle size={16} />
-                                                    </button>
                                                 )}
-                                                <button
-                                                    className="btn-icon"
-                                                    onClick={() => openEditModal(u)}
-                                                    title="Edit User"
-                                                >
-                                                    <Edit size={16} />
-                                                </button>
-                                                <button
-                                                    className="btn-icon"
-                                                    onClick={() => openFeatureModal(u)}
-                                                    title="Manage Features"
-                                                >
-                                                    <Settings size={16} />
-                                                </button>
-                                                {u.id !== user?.id && (
-                                                    <button
-                                                        className="btn-icon danger"
-                                                        onClick={() => handleDeleteUser(u.id)}
-                                                        title="Delete User"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
+                                            </td>
+                                            <td>
+                                                <span className={`badge ${u.role === 'admin' ? 'bg-blue-500' : u.role === 'sysadmin' ? 'bg-purple-500' : 'bg-emerald-500'}`}>
+                                                    {u.role === 'admin' ? 'Admin' : u.role === 'sysadmin' ? 'Sys Admin' : u.role === 'kitchen' ? 'Kitchen' : u.role}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span className={`badge ${u.subscription_status === 'active' ? 'bg-green-500' : u.subscription_status === 'trial' ? 'bg-yellow-500' : 'bg-red-500'}`}>
+                                                    {u.subscription_status || 'active'}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {u.features ? (
+                                                    <span className="badge bg-slate-500 text-white">
+                                                        {Object.values(u.features).filter(Boolean).length}/{Object.keys(u.features).length}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-muted">—</span>
                                                 )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {searchQuery && users.filter(u => {
-                                    const query = searchQuery.toLowerCase();
-                                    return (
-                                        (u.username && u.username.toLowerCase().includes(query)) ||
-                                        (u.business_name && u.business_name.toLowerCase().includes(query)) ||
-                                        (u.email && u.email.toLowerCase().includes(query)) ||
-                                        (u.phone && u.phone.toLowerCase().includes(query)) ||
-                                        (u.id && u.id.toString().includes(query)) ||
-                                        (u.role && u.role.toLowerCase().includes(query))
-                                    );
-                                }).length === 0 && (
-                                        <tr>
-                                            <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                                    <Search size={32} style={{ opacity: 0.3 }} />
-                                                    <p>No users found matching "{searchQuery}"</p>
+                                            </td>
+                                            <td>
+                                                {u.role === 'admin' ? (
+                                                    <span className={`badge ${u.is_verified ? 'bg-green-500' : 'bg-yellow-500'}`}>
+                                                        {u.is_verified ? 'Verified' : 'Pending'}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-muted">—</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                {(() => {
+                                                    const accessStatus = getAccessStatus(u);
+                                                    return (
+                                                        <span className={`badge ${accessStatus.color}`} title={
+                                                            u.active_window_start || u.active_window_end
+                                                                ? `Access: ${u.active_window_start || 'No start'} to ${u.active_window_end || 'No end'}`
+                                                                : 'Unlimited access'
+                                                        }>
+                                                            {accessStatus.label}
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </td>
+                                            <td className="text-xs text-muted">
+                                                {u.last_login
+                                                    ? new Date(u.last_login).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })
+                                                    : <span style={{ color: '#d1d5db' }}>Never</span>}
+                                            </td>
+                                            <td>
+                                                <div className="flex gap-2">
+                                                    {u.role === 'admin' && !u.is_verified && (
+                                                        <button className="btn-icon success" onClick={() => handleVerifyUser(u.id)} title="Verify admin">
+                                                            <CheckCircle size={16} />
+                                                        </button>
+                                                    )}
+                                                    <button className="btn-icon" onClick={() => openEditModal(u)} title="Edit User">
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button className="btn-icon" onClick={() => openFeatureModal(u)} title="Manage Features">
+                                                        <Settings size={16} />
+                                                    </button>
+                                                    {u.id !== user?.id && (
+                                                        <button className="btn-icon danger" onClick={() => handleDeleteUser(u.id)} title="Delete User">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
-                                    )}
+                                    ));
+                                })()}
                             </tbody>
                         </table>
                     </div>
@@ -669,6 +662,17 @@ const AdminManagement = () => {
                                     value={formData.phone}
                                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                 />
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium mb-2">WhatsApp Business Number</label>
+                                <input
+                                    className="input"
+                                    type="text"
+                                    placeholder="+919876543210"
+                                    value={formData.whatsapp_from_display}
+                                    onChange={(e) => setFormData({ ...formData, whatsapp_from_display: e.target.value })}
+                                />
+                                <p className="text-xs text-muted mt-1">The number this admin will send invoices FROM (requires WhatsApp Business API credentials configured in Settings)</p>
                             </div>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-2">Password</label>
@@ -986,6 +990,17 @@ const AdminManagement = () => {
                                                 placeholder="+1 (555) 000-0000"
                                             />
                                         </div>
+                                        <div>
+                                            <label className="label-text">WhatsApp Business Number</label>
+                                            <input
+                                                className="input"
+                                                type="text"
+                                                value={formData.whatsapp_from_display}
+                                                onChange={(e) => setFormData({ ...formData, whatsapp_from_display: e.target.value })}
+                                                placeholder="+919876543210"
+                                            />
+                                            <p className="input-helper">Display number for WhatsApp Business API</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1014,6 +1029,7 @@ const AdminManagement = () => {
                 isOpen={showFeatureModal}
                 userId={featureUser?.id}
                 userName={featureUser?.username}
+                userBusinessType={featureUser?.business_type}
                 onClose={closeFeatureModal}
                 onSave={fetchUsers}
             />

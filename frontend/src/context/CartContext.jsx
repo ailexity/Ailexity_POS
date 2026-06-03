@@ -40,6 +40,10 @@ export const CartProvider = ({ children }) => {
         }
     });
 
+    // Discount: persisted per-cart-session in state only (reset on checkout)
+    const [discountType, setDiscountType] = useState('flat'); // 'flat' | 'percent'
+    const [discountValue, setDiscountValue] = useState(0);
+
     // Get current table's cart items
     const cartItems = useMemo(() => {
         if (!selectedTable) return [];
@@ -247,13 +251,33 @@ export const CartProvider = ({ children }) => {
     }, [cartItems]);
 
     const cartTax = useMemo(() => {
-        // Use global tax rate for all items
         return cartItems.reduce((acc, item) => acc + (item.price * item.qty * (taxRate / 100)), 0);
     }, [cartItems, taxRate]);
 
+    const discountAmount = useMemo(() => {
+        const val = Number(discountValue) || 0;
+        if (val <= 0) return 0;
+        if (discountType === 'percent') {
+            return Math.min((cartTotal + cartTax) * (val / 100), cartTotal + cartTax);
+        }
+        return Math.min(val, cartTotal + cartTax);
+    }, [cartTotal, cartTax, discountType, discountValue]);
+
     const grandTotal = useMemo(() => {
-        return cartTotal + cartTax;
-    }, [cartTotal, cartTax]);
+        return cartTotal + cartTax - discountAmount;
+    }, [cartTotal, cartTax, discountAmount]);
+
+    const clearDiscount = () => { setDiscountValue(0); setDiscountType('flat'); };
+
+    const updateItemNotes = (itemId, notes) => {
+        if (!selectedTable) return;
+        setTableCarts(prev => ({
+            ...prev,
+            [selectedTable.id]: (prev[selectedTable.id] || []).map(i =>
+                i.id === itemId ? { ...i, notes: notes || '' } : i
+            ),
+        }));
+    };
 
     return (
         <CartContext.Provider value={{
@@ -270,6 +294,13 @@ export const CartProvider = ({ children }) => {
             cartTotal,
             cartTax,
             grandTotal,
+            discountType,
+            discountValue,
+            discountAmount,
+            setDiscountType,
+            setDiscountValue,
+            clearDiscount,
+            updateItemNotes,
             tableCarts,
             multiDeviceSyncEnabled,
             setMultiDeviceSync,

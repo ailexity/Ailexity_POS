@@ -189,6 +189,7 @@ def _get_public_invoice_data(invoice_id: str, db: Database):
     if admin:
         invoice_dict['business_name'] = admin.get('business_name')
         invoice_dict['business_address'] = admin.get('business_address')
+        invoice_dict['business_type'] = admin.get('business_type')
         invoice_dict['store_email'] = admin.get('store_email')
         invoice_dict['store_phone'] = admin.get('store_phone')
         invoice_dict['gstin'] = admin.get('gstin')
@@ -558,6 +559,21 @@ def get_statistics(
         low_stock_filter.update({"limit_stock": True, "stock_quantity": {"$lt": 10}})
         low_stock_items = database.items_collection.count_documents(low_stock_filter)
 
+        # Daily revenue for the past 7 days (index 0 = 6 days ago, index 6 = today)
+        seven_days_ago = today - timedelta(days=6)
+        daily_revenue = {i: 0.0 for i in range(7)}
+        for day_doc in database.invoices_collection.aggregate([
+            {"$match": {**match, "created_at": {"$gte": seven_days_ago}}},
+            {"$group": {
+                "_id": {"$dateDiff": {"startDate": seven_days_ago, "endDate": "$created_at", "unit": "day"}},
+                "revenue": {"$sum": {"$ifNull": ["$total_amount", 0]}}
+            }}
+        ]):
+            idx = day_doc.get("_id")
+            if isinstance(idx, int) and 0 <= idx <= 6:
+                daily_revenue[idx] = day_doc.get("revenue", 0)
+        daily_data = [daily_revenue[i] for i in range(7)]
+
         total_revenue = totals_doc.get("totalRevenue", 0)
         total_orders = totals_doc.get("totalOrders", 0)
         total_items = totals_doc.get("totalItems", 0)
@@ -579,7 +595,8 @@ def get_statistics(
             "monthProfit": month_profit,
             "lowStockItems": low_stock_items,
             "paymentModes": payment_modes,
-            "hourlyData": hourly_data
+            "hourlyData": hourly_data,
+            "dailyData": daily_data,
         }
     except Exception as e:
         print(f"Error in statistics endpoint: {e}")
@@ -602,7 +619,8 @@ def get_statistics(
             "monthProfit": 0,
             "lowStockItems": 0,
             "paymentModes": {},
-            "hourlyData": [0] * 24
+            "hourlyData": [0] * 24,
+            "dailyData": [0] * 7,
         }
 
 @router.post("/", response_model=schemas.InvoiceResponse)
@@ -718,6 +736,13 @@ def create_invoice(
         new_invoice['table_number'] = invoice.table_number
     if invoice.table_name:
         new_invoice['table_name'] = invoice.table_name
+
+    # Apply discount: reduce total_amount and store discount metadata
+    discount_amount = float(invoice.discount_amount or 0)
+    if discount_amount > 0:
+        new_invoice['discount_amount'] = discount_amount
+        new_invoice['discount_type'] = invoice.discount_type
+        new_invoice['total_amount'] = max(0.0, total_amount - discount_amount)
     
     result = database.invoices_collection.insert_one(new_invoice)
     new_invoice["_id"] = result.inserted_id
@@ -732,6 +757,7 @@ def create_invoice(
     invoice_dict = serialize_doc(new_invoice)
     invoice_dict['business_name'] = current_user.get('business_name')
     invoice_dict['business_address'] = current_user.get('business_address')
+    invoice_dict['business_type'] = current_user.get('business_type')
     invoice_dict['store_email'] = current_user.get('store_email')
     invoice_dict['store_phone'] = current_user.get('store_phone')
     invoice_dict['gstin'] = current_user.get('gstin')

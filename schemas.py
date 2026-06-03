@@ -5,7 +5,7 @@ from datetime import datetime
 # --- User Schemas ---
 class UserBase(BaseModel):
     username: str
-    role: str = "admin" # Default changed to admin as cashier is removed
+    role: str = "admin"
     business_name: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
@@ -27,16 +27,45 @@ class UserBase(BaseModel):
     invoice_notes: Optional[str] = None
     invoice_terms: Optional[str] = None
     whatsapp_message: Optional[str] = None
-    monthly_target: Optional[float] = None  # Monthly revenue target for dashboard
-    active_window_start: Optional[str] = None  # Login access start date (YYYY-MM-DD)
-    active_window_end: Optional[str] = None  # Login access end date (YYYY-MM-DD)
-    enable_multi_device_sync: Optional[bool] = False  # Enable multi-device cart sync
-    enable_order_management: Optional[bool] = False  # Enable order management feature
-    features: Optional[Dict[str, bool]] = None  # Managed access flags for user features
+    monthly_target: Optional[float] = None
+    active_window_start: Optional[str] = None
+    active_window_end: Optional[str] = None
+    enable_multi_device_sync: Optional[bool] = False
+    enable_order_management: Optional[bool] = False
+    features: Optional[Dict[str, bool]] = None
+    # WhatsApp Business API
+    whatsapp_from_display: Optional[str] = None  # Display phone e.g. +919876543210
+    whatsapp_enabled: Optional[bool] = False
+    whatsapp_message_type: Optional[str] = "text"  # "text" | "template"
+    whatsapp_template_name: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
     subscription_status: str = "active"
+
+class UserUpdateByAdmin(BaseModel):
+    """Schema for sysadmin editing any user — all fields optional, password only set if non-empty."""
+    username: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    business_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    business_address: Optional[str] = None
+    business_type: Optional[str] = None
+    tax_id: Optional[str] = None
+    tax_rate: Optional[float] = None
+    subscription_status: Optional[str] = None
+    active_window_start: Optional[str] = None
+    active_window_end: Optional[str] = None
+    enable_multi_device_sync: Optional[bool] = None
+    enable_order_management: Optional[bool] = None
+    features: Optional[Dict[str, bool]] = None
+    whatsapp_from_display: Optional[str] = None
+
+class StatusUpdate(BaseModel):
+    subscription_status: str
 
 class PasswordVerification(BaseModel):
     password: str
@@ -75,17 +104,46 @@ class UserLogin(BaseModel):
     password: str
 
 class UserResponse(UserBase):
-    id: str  # MongoDB ObjectId as string
+    id: str
     is_active: bool
     is_verified: Optional[bool] = False
     subscription_status: str = "active"
-    active_window_start: Optional[str] = None  # Login access start date
-    active_window_end: Optional[str] = None  # Login access end date
-    enable_multi_device_sync: Optional[bool] = False  # Enable multi-device cart sync
+    active_window_start: Optional[str] = None
+    active_window_end: Optional[str] = None
+    enable_multi_device_sync: Optional[bool] = False
     created_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
+    # WhatsApp (token is intentionally excluded — use /whatsapp/config endpoints)
+    whatsapp_enabled: Optional[bool] = False
+    whatsapp_from_display: Optional[str] = None
+    whatsapp_message_type: Optional[str] = "text"
+    whatsapp_template_name: Optional[str] = None
     class Config:
         from_attributes = True
+
+# ── WhatsApp Config Schemas ──────────────────────────────────────────────
+class WhatsAppConfigSave(BaseModel):
+    phone_number_id: str          # Meta Phone Number ID
+    access_token: str             # Meta Cloud API Bearer token
+    from_display: str             # Display number e.g. +91-98765-43210
+    message_type: str = "text"   # "text" | "template"
+    template_name: Optional[str] = None
+    enabled: bool = True
+
+class WhatsAppConfigStatus(BaseModel):
+    enabled: bool
+    from_display: Optional[str] = None
+    message_type: str = "text"
+    template_name: Optional[str] = None
+    has_credentials: bool = False  # True if phone_number_id + token are saved
+
+class WhatsAppSendRequest(BaseModel):
+    to_phone: str
+    invoice_id: str
+    invoice_number: str
+    customer_name: Optional[str] = None
+    total_amount: float
+    invoice_url: Optional[str] = None
 
 # --- Item Schemas ---
 class ItemBase(BaseModel):
@@ -132,7 +190,9 @@ class InvoiceCreate(BaseModel):
     payment_status: str = "Paid"
     table_number: Optional[str] = None
     table_name: Optional[str] = None
-    created_at: Optional[datetime] = None  # Allow frontend to send device timestamp
+    created_at: Optional[datetime] = None
+    discount_amount: Optional[float] = 0.0
+    discount_type: Optional[str] = None  # 'flat' | 'percent'
     items: List[InvoiceItemCreate]
 
 class InvoiceItemResponse(BaseModel):
@@ -166,9 +226,12 @@ class InvoiceResponse(BaseModel):
     payment_status: str = "Paid"
     table_number: Optional[str] = None
     table_name: Optional[str] = None
+    discount_amount: Optional[float] = 0.0
+    discount_type: Optional[str] = None
     # Business details
     business_name: Optional[str] = None
     business_address: Optional[str] = None
+    business_type: Optional[str] = None
     store_email: Optional[str] = None
     store_phone: Optional[str] = None
     gstin: Optional[str] = None
@@ -199,6 +262,15 @@ class AttendeeCreate(BaseModel):
     email: Optional[str] = None
 
 
+class AttendeeUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    active_window_start: Optional[str] = None
+    active_window_end: Optional[str] = None
+    features: Optional[Dict[str, bool]] = None
+
 class AttendeeResponse(BaseModel):
     id: str
     username: str
@@ -208,6 +280,10 @@ class AttendeeResponse(BaseModel):
     role: str
     is_active: bool
     admin_id: Optional[str] = None
+    active_window_start: Optional[str] = None
+    active_window_end: Optional[str] = None
+    features: Optional[Dict[str, bool]] = None
+    last_login: Optional[datetime] = None
     class Config:
         from_attributes = True
 

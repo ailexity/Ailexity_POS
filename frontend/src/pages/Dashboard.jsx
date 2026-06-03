@@ -23,6 +23,8 @@ import {
 import api from '../api';
 import AIAssistant from '../components/AIAssistant';
 import PageLoader from '../components/PageLoader';
+import { DashboardSkeleton } from '../components/Skeleton';
+import DayEndModal from '../components/DayEndModal';
 import { useAuth } from '../context/AuthContext';
 
 const emptyStats = {
@@ -44,6 +46,7 @@ const emptyStats = {
     topCategories: [],
     recentInvoices: [],
     hourlyData: Array(24).fill(0),
+    dailyData: Array(7).fill(0),
     paymentModes: {}
 };
 
@@ -69,6 +72,7 @@ const Dashboard = () => {
     const { user } = useAuth();
     const [businessType, setBusinessType] = useState('restaurant');
     const [stats, setStats] = useState(emptyStats);
+    const [showDayEnd, setShowDayEnd] = useState(false);
     const [loading, setLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [monthlyTarget, setMonthlyTarget] = useState(0);
@@ -212,6 +216,7 @@ const Dashboard = () => {
                         ? invoicesRes.value.data
                         : [],
                     hourlyData: Array.isArray(statsData.hourlyData) ? statsData.hourlyData : Array(24).fill(0),
+                    dailyData: Array.isArray(statsData.dailyData) ? statsData.dailyData : Array(7).fill(0),
                     paymentModes: statsData.paymentModes || {}
                 });
             } else {
@@ -292,7 +297,8 @@ const Dashboard = () => {
     if (loading && stats.totalOrders === 0) {
         return (
             <div className="page-container with-mobile-branding-offset">
-                <PageLoader message="Loading dashboard..." />
+                <div className="mobile-branding-bar"><span>Ailexity POS</span></div>
+                <DashboardSkeleton />
             </div>
         );
     }
@@ -343,6 +349,16 @@ const Dashboard = () => {
                 </div>
 
                 <div className="dashboard-hero-side">
+                    <button
+                        type="button"
+                        className="dashboard-refresh-btn"
+                        onClick={() => setShowDayEnd(true)}
+                        title="End of Day Summary"
+                        style={{ background: '#fef3c7', color: '#92400e', borderColor: '#fcd34d' }}
+                    >
+                        <span>📋</span>
+                        <span>End of Day</span>
+                    </button>
                     <button
                         type="button"
                         className="dashboard-refresh-btn"
@@ -471,6 +487,11 @@ const Dashboard = () => {
                         </section>
 
                         <section className="dashboard-card">
+                            <SectionHeader icon={TrendingUp} title="7-Day Revenue Trend" subtitle="Daily sales over the last week" tone="teal" />
+                            <WeekTrendChart data={stats.dailyData} formatCurrency={formatCurrency} />
+                        </section>
+
+                        <section className="dashboard-card">
                             <SectionHeader icon={BarChart3} title="Performance Overview" subtitle="All-time business metrics" tone="blue" />
                             <div className="dashboard-metrics-grid">
                                 <MetricTile icon={DollarSign} label="Total Revenue" value={formatCurrency(stats.totalRevenue)} tone="orange" />
@@ -552,6 +573,14 @@ const Dashboard = () => {
                     )}
                 </section>
             </main>
+
+            <DayEndModal
+                isOpen={showDayEnd}
+                onClose={() => setShowDayEnd(false)}
+                stats={stats}
+                businessName={businessName}
+                formatCurrency={formatCurrency}
+            />
         </div>
     );
 };
@@ -692,5 +721,84 @@ const SummaryCard = ({ icon, label, value, tone }) => (
         <strong>{value}</strong>
     </article>
 );
+
+/* ── 7-day SVG line chart ───────────────────────────────────────────────── */
+const WeekTrendChart = ({ data = [], formatCurrency }) => {
+    const W = 560, H = 100, PAD = { top: 12, right: 16, bottom: 24, left: 8 };
+    const innerW = W - PAD.left - PAD.right;
+    const innerH = H - PAD.top - PAD.bottom;
+    const values = data.length === 7 ? data.map(Number) : Array(7).fill(0);
+    const max = Math.max(...values, 1);
+    const hasData = values.some(v => v > 0);
+
+    const days = ['6d', '5d', '4d', '3d', '2d', 'Yest', 'Today'];
+    const pts = values.map((v, i) => ({
+        x: PAD.left + (i / 6) * innerW,
+        y: PAD.top + innerH - (v / max) * innerH,
+        v,
+    }));
+
+    const path = pts
+        .map((p, i) => {
+            if (i === 0) return `M ${p.x} ${p.y}`;
+            const prev = pts[i - 1];
+            const cpx = (prev.x + p.x) / 2;
+            return `C ${cpx} ${prev.y} ${cpx} ${p.y} ${p.x} ${p.y}`;
+        })
+        .join(' ');
+
+    const fillPath = `${path} L ${pts[6].x} ${PAD.top + innerH} L ${pts[0].x} ${PAD.top + innerH} Z`;
+
+    return (
+        <div className="week-trend-chart" style={{ position: 'relative' }}>
+            {!hasData && (
+                <p style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--text-light)', margin: 0 }}>
+                    No sales in the last 7 days
+                </p>
+            )}
+            <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H, display: 'block' }}>
+                {/* grid lines */}
+                {[0.25, 0.5, 0.75, 1].map((f) => (
+                    <line key={f} x1={PAD.left} x2={W - PAD.right}
+                        y1={PAD.top + innerH * (1 - f)} y2={PAD.top + innerH * (1 - f)}
+                        stroke="#e2e8f0" strokeWidth="1" />
+                ))}
+                {/* area fill */}
+                {hasData && (
+                    <path d={fillPath} fill="url(#weekGrad)" opacity="0.35" />
+                )}
+                {/* line */}
+                {hasData && (
+                    <path d={path} fill="none" stroke="#108a85" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                )}
+                {/* dots */}
+                {hasData && pts.map((p, i) => (
+                    <circle key={i} cx={p.x} cy={p.y} r={i === 6 ? 5 : 3.5}
+                        fill={i === 6 ? '#108a85' : '#fff'} stroke="#108a85" strokeWidth="2" />
+                ))}
+                {/* day labels */}
+                {pts.map((p, i) => (
+                    <text key={i} x={p.x} y={H - 2} textAnchor="middle"
+                        fontSize="9" fill={i === 6 ? '#108a85' : '#94a3b8'} fontWeight={i === 6 ? 700 : 400}>
+                        {days[i]}
+                    </text>
+                ))}
+                {/* value tooltip on today dot */}
+                {hasData && (
+                    <text x={pts[6].x} y={pts[6].y - 9} textAnchor="middle"
+                        fontSize="10" fill="#108a85" fontWeight={700}>
+                        {formatCurrency(pts[6].v)}
+                    </text>
+                )}
+                <defs>
+                    <linearGradient id="weekGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#108a85" />
+                        <stop offset="100%" stopColor="#108a85" stopOpacity="0" />
+                    </linearGradient>
+                </defs>
+            </svg>
+        </div>
+    );
+};
 
 export default Dashboard;
