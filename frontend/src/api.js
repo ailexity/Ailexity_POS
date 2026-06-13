@@ -3,8 +3,8 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '/api');
 
 if (import.meta.env.PROD && !import.meta.env.VITE_API_URL) {
-    throw new Error(
-        '❌ VITE_API_URL must be configured for production!\n' +
+    console.warn(
+        '⚠️ VITE_API_URL was not set at build time, falling back to "/api".\n' +
         'Create frontend/.env with:\n' +
         '  VITE_API_URL=/api'
     );

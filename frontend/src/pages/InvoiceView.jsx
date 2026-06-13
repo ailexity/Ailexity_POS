@@ -163,7 +163,7 @@ const RestaurantInvoice = ({ invoice }) => {
             )}
 
             {/* ── Footer ───────────────────────────────────────────────── */}
-            <div style={{ marginTop: 'auto', textAlign: 'center', padding: '24px 32px', borderTop: `2px dashed ${A}40`, marginTop: 20 }}>
+            <div style={{ textAlign: 'center', padding: '24px 32px', borderTop: `2px dashed ${A}40`, marginTop: 20 }}>
                 <p style={{ fontSize: 16, fontWeight: 700, color: A, margin: '0 0 4px' }}>Thank you for dining with us! 🍽</p>
                 {invoice.invoice_terms && <p style={{ fontSize: 11, color: MUTED, margin: '0 0 4px' }}>{invoice.invoice_terms}</p>}
                 <p style={{ fontSize: 10, color: '#d1d5db', margin: 0 }}>Powered by Ailexity POS</p>
