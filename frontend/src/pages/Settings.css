@@ -1,22 +1,29 @@
-/* Settings page - minimal style aligned with POS */
+/* Settings page - landing page theme */
 
 .settings-page {
-    background: #fafafa;
+    background: var(--bg-color);
 }
 
 .settings-page .header-section {
-    background: #ffffff;
-    border-bottom: 1px solid #e5e7eb;
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+    margin: 0;
 }
 
 .settings-page .header-section .w-8.h-8 {
-    border-radius: 10px;
-    background: #f3f4f6 !important;
+    border-radius: var(--radius-md);
+    background: var(--accent-light) !important;
     box-shadow: none !important;
 }
 
 .settings-page .header-section .w-8.h-8 svg {
-    color: #111827 !important;
+    color: var(--accent-color) !important;
 }
 
 .settings-page .settings-content {
@@ -31,39 +38,44 @@
 }
 
 .settings-page .settings-tabs-bar {
-    background: #ffffff !important;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 10px;
-    box-shadow: none !important;
-    padding: 10px !important;
-    gap: 8px !important;
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm) !important;
+    padding: 12px !important;
+    gap: 10px !important;
 }
 
 .settings-page .settings-panel {
-    background: #ffffff !important;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 12px !important;
-    box-shadow: none !important;
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-sm) !important;
+    padding: 24px !important;
 }
 
 .settings-page .settings-panel textarea,
 .settings-page .settings-panel .input {
     background: #ffffff !important;
-    border-color: #d1d5db !important;
+    border-color: var(--border-light) !important;
 }
 
 .settings-page .settings-panel button:not(.mobile-nav-button) {
-    border-radius: 8px;
+    border-radius: var(--radius-md);
+    background: var(--accent-color) !important;
+    border-color: var(--accent-color) !important;
+    color: #ffffff !important;
+    transition: all 0.2s ease !important;
 }
 
 .settings-page .settings-panel button[style*='background-color: rgb(17, 24, 39)'] {
-    background-color: #111827 !important;
-    border-color: #111827 !important;
+    background-color: var(--accent-color) !important;
+    border-color: var(--accent-color) !important;
     color: #ffffff !important;
 }
 
 .settings-page .settings-panel button[style*='background-color: rgb(17, 24, 39)']:hover {
-    background-color: #1f2937 !important;
+    background-color: var(--accent-hover) !important;
 }
 
 @media (max-width: 1023px) {

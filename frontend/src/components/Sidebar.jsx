@@ -1,20 +1,43 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, ShoppingCart, Package, FileText, Settings, LogOut, Shield, BarChart3, Bell, Box, Boxes, Users, DollarSign } from 'lucide-react';
+import { Home, ShoppingCart, Package, FileText, Settings, LogOut, Shield, BarChart3, Bell, Box, Boxes, Users, DollarSign, UserCheck, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { canAccessOrderManagement, hasFeature, normalizeBusinessType, isLimitedRoleUser } from '../utils/featureAccess';
 
-const normalizeBusinessType = (businessType) => {
-    const value = String(businessType || '').toLowerCase();
-    if (value.includes('retail')) return 'retailer';
-    return 'restaurant';
+const accessMessage = 'This feature is locked for your account. Please contact admin to access it.';
+
+const SidebarItem = ({ to, icon: Icon, label, locked = false }) => {
+    if (locked) {
+        return (
+            <button
+                type="button"
+                className="nav-item nav-item-locked w-full text-left"
+                title={accessMessage}
+                aria-label={`${label} locked. Contact admin to access it.`}
+                onClick={() => window.alert(accessMessage)}
+            >
+                <Icon size={20} />
+                <span>{label}</span>
+                <Lock size={15} className="nav-lock-icon" aria-hidden="true" />
+            </button>
+        );
+    }
+
+    return (
+        <NavLink to={to} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <Icon size={20} />
+            <span>{label}</span>
+        </NavLink>
+    );
 };
 
 const Sidebar = () => {
     const { logout, user } = useAuth();
     const isSysAdmin = user?.role === 'sysadmin';
+    const isLimited = isLimitedRoleUser(user);
     const businessType = normalizeBusinessType(user?.business_type);
-    const isRestaurant = !isSysAdmin && businessType === 'restaurant';
     const isRetailer = !isSysAdmin && businessType === 'retailer';
+    const isRestaurant = !isSysAdmin && businessType === 'restaurant';
 
     return (
         <div className="sidebar">
@@ -23,97 +46,78 @@ const Sidebar = () => {
                 <h1>Ailexity POS</h1>
             </div>
 
+            <div className="sidebar-status">
+                <span className="sidebar-status-badge">
+                    {isSysAdmin ? 'Sysadmin Workspace' : isLimited ? (user?.role === 'kitchen' ? 'Kitchen Display' : 'Attendee Workspace') : businessType === 'retailer' ? 'Retailer Workspace' : 'Restaurant Workspace'}
+                </span>
+                {!isSysAdmin && !isLimited && (
+                    <p className="sidebar-status-copy">
+                        {isRetailer
+                            ? 'Organized for invoices, stock flow, party credit, and ledger control.'
+                            : 'Organized for fast billing, kitchen inventory, and online order flow.'}
+                    </p>
+                )}
+            </div>
+
             <nav>
-                {/* Dashboard - Only for admin, NOT sysadmin */}
-                {!isSysAdmin && (
-                    <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                        <Home size={20} />
-                        <span>Dashboard</span>
-                    </NavLink>
-                )}
-
-                {/* System Dashboard - Only sysadmin */}
-                {isSysAdmin && (
-                    <NavLink to="/system" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                        <BarChart3 size={20} />
-                        <span>System Dashboard</span>
-                    </NavLink>
-                )}
-
-                {/* Only show POS, History, Items to admin - NOT sysadmin */}
-                {!isSysAdmin && (
+                {isLimited ? (
+                    // Simplified menu for KOT/attendee users - only show unlocked items
+                    <div className="sidebar-group">
+                        <div className="sidebar-group-title">Menu</div>
+                        {user?.role === 'kitchen' && hasFeature(user, 'kot_printing') && (
+                            <SidebarItem to="/kots" icon={Package} label="Kitchen Orders" />
+                        )}
+                        {user?.role === 'attendee' && hasFeature(user, 'pos_billing') && (
+                            <SidebarItem to="/pos" icon={ShoppingCart} label="Billing" />
+                        )}
+                    </div>
+                ) : !isSysAdmin && (
                     <>
-                        <NavLink to="/pos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                            <ShoppingCart size={20} />
-                            <span>Billing</span>
-                        </NavLink>
+                        <div className="sidebar-group">
+                            <div className="sidebar-group-title">Core tools</div>
+                            <SidebarItem to="/dashboard" icon={Home} label="Dashboard" locked={!hasFeature(user, 'dashboard')} />
+                            <SidebarItem to="/pos" icon={ShoppingCart} label="Billing" locked={!hasFeature(user, 'pos_billing')} />
+                            <SidebarItem to="/history" icon={FileText} label={isRetailer ? 'Invoices' : 'History'} locked={!hasFeature(user, 'invoices')} />
+                            <SidebarItem to="/employees" icon={UserCheck} label="Employees" locked={!hasFeature(user, 'attendees_management')} />
+                        </div>
 
                         {isRestaurant && (
-                            <NavLink to="/history" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <FileText size={20} />
-                                <span>History</span>
-                            </NavLink>
+                            <div className="sidebar-group">
+                                <div className="sidebar-group-title">Restaurant features</div>
+                                <SidebarItem to="/items" icon={Package} label="Inventory" locked={!hasFeature(user, 'items_management')} />
+                                <SidebarItem to="/stock" icon={Boxes} label="Stock" locked={!hasFeature(user, 'stock_management')} />
+                                <SidebarItem to="/orders" icon={Box} label="Online Orders" locked={!canAccessOrderManagement(user)} />
+                                <SidebarItem to="/kots" icon={Package} label="Kitchen Orders" locked={!hasFeature(user, 'kot_printing')} />
+                            </div>
                         )}
 
                         {isRetailer && (
-                            <NavLink to="/history" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <FileText size={20} />
-                                <span>Invoices</span>
-                            </NavLink>
-                        )}
-
-                        {isRestaurant && (
-                            <NavLink to="/items" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <Package size={20} />
-                                <span>Inventory</span>
-                            </NavLink>
-                        )}
-
-                        {isRetailer && (
-                            <NavLink to="/stock" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <Boxes size={20} />
-                                <span>Stock</span>
-                            </NavLink>
-                        )}
-
-                        {isRetailer && (
-                            <NavLink to="/parties" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <Users size={20} />
-                                <span>Parties</span>
-                            </NavLink>
-                        )}
-
-                        {isRetailer && (
-                            <NavLink to="/ledger" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <DollarSign size={20} />
-                                <span>Ledger</span>
-                            </NavLink>
-                        )}
-
-                        {isRestaurant && user?.enable_order_management && (
-                            <NavLink to="/orders" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                                <Box size={20} />
-                                <span>Online Orders</span>
-                            </NavLink>
+                            <div className="sidebar-group">
+                                <div className="sidebar-group-title">Retailer features</div>
+                                <SidebarItem to="/stock" icon={Boxes} label="Stock" locked={!hasFeature(user, 'stock_management')} />
+                                <SidebarItem to="/parties" icon={Users} label="Parties" locked={!hasFeature(user, 'parties_management')} />
+                                <SidebarItem to="/ledger" icon={DollarSign} label="Ledger" locked={!hasFeature(user, 'ledger_management')} />
+                            </div>
                         )}
                     </>
                 )}
 
-                {/* System Admin - only for sysadmin */}
                 {isSysAdmin && (
-                    <>
-                        <div style={{ margin: '0.5rem 0', borderTop: '1px solid var(--border-light)' }}></div>
-
+                    <div className="sidebar-group">
+                        <div className="sidebar-group-title">Admin tools</div>
+                        <NavLink to="/system" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                            <BarChart3 size={20} />
+                            <span>System Dashboard</span>
+                        </NavLink>
                         <NavLink to="/admin" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                             <Shield size={20} />
                             <span>System Admin</span>
                         </NavLink>
-
                         <NavLink to="/alerts" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                             <Bell size={20} />
                             <span>Alerts</span>
                         </NavLink>
-                    </>
+                    </div>
                 )}
             </nav>
 
@@ -121,15 +125,12 @@ const Sidebar = () => {
                 <div className="user-info">
                     <div className="user-name">{user?.username}</div>
                     <div className="user-role">
-                        {user?.role}{!isSysAdmin ? ` · ${businessType}` : ''}
+                        {user?.role}{!isSysAdmin && !isLimited ? ` · ${businessType}` : ''}
                     </div>
                 </div>
 
-                {!isSysAdmin && (
-                    <NavLink to="/settings" className="nav-item">
-                        <Settings size={20} />
-                        <span>Settings</span>
-                    </NavLink>
+                {!isSysAdmin && !isLimited && (
+                    <SidebarItem to="/settings" icon={Settings} label="Settings" locked={!hasFeature(user, 'admin_panel')} />
                 )}
 
                 <button onClick={logout} className="nav-item w-full text-left" style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}>

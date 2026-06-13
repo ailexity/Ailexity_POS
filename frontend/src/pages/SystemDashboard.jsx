@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Users, Activity, TrendingUp, DollarSign, ShoppingCart, Package, BarChart3, Shield, UserPlus, AlertCircle, Eye, EyeOff, Search, Settings, Lock, Save, Database, Globe, MessageCircle } from 'lucide-react';
+import { Users, Activity, TrendingUp, DollarSign, ShoppingCart, Package, BarChart3, Shield, UserPlus, AlertCircle, Eye, EyeOff, Search, Settings, Lock, Save, Database, Globe, MessageCircle, CheckCircle, Download } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 import PageLoader from '../components/PageLoader';
 
 const normalizeBusinessType = (businessType) => {
@@ -71,7 +72,13 @@ const SystemDashboard = () => {
         show_total: true
     });
     const [whatsappMessage, setWhatsappMessage] = useState({ type: '', text: '' });
-    
+
+    // Backup state
+    const [backupLoading, setBackupLoading] = useState(false);
+    const [backupAdminId, setBackupAdminId] = useState('');
+    const [backupMessage, setBackupMessage] = useState({ type: '', text: '' });
+    const [backupStats, setBackupStats] = useState(null);
+
     const [formData, setFormData] = useState({
         username: '',
         password: '',
@@ -85,17 +92,68 @@ const SystemDashboard = () => {
         tax_id: '',
         tax_rate: '',
         subscription_status: 'active',
-        enable_order_management: false
+        enable_order_management: false,
+        whatsapp_from_display: '',
     });
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    // Security: Redirect if not sysadmin
+    // Security: Redirect if not admin or sysadmin
     useEffect(() => {
-        if (user && user.role !== 'sysadmin') {
+        if (user && !['sysadmin', 'admin'].includes(user.role)) {
             navigate('/');
         }
     }, [user, navigate]);
+
+    // Attendees (waiters) management state
+    const [attendees, setAttendees] = useState([]);
+    const [attendeeForm, setAttendeeForm] = useState({ username: '', password: '', full_name: '', phone: '', email: '' });
+    const [attendeesLoading, setAttendeesLoading] = useState(false);
+
+    const fetchAttendees = async () => {
+        setAttendeesLoading(true);
+        try {
+            const res = await api.get('/attendees');
+            setAttendees(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+            console.error('Failed to load attendees', err);
+        } finally {
+            setAttendeesLoading(false);
+        }
+    };
+
+    const handleCreateAttendee = async (e) => {
+        e.preventDefault();
+        try {
+            await api.post('/attendees', attendeeForm);
+            setAttendeeForm({ username: '', password: '', full_name: '', phone: '', email: '' });
+            fetchAttendees();
+        } catch (err) {
+            console.error('Failed to create attendee', err);
+            setError(err.response?.data?.detail || 'Failed to create attendee');
+        }
+    };
+
+    const handleDeleteAttendee = async (id) => {
+        if (!confirm('Remove this attendee?')) return;
+        try {
+            await api.delete(`/attendees/${id}`);
+            fetchAttendees();
+        } catch (err) {
+            console.error('Failed to delete attendee', err);
+            setError(err.response?.data?.detail || 'Failed to delete attendee');
+        }
+    };
+
+    const handleVerifyUser = async (userId) => {
+        setError('');
+        try {
+            await api.post(`/users/${userId}/verify`);
+            fetchSystemStats();
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Failed to verify user');
+        }
+    };
 
     useEffect(() => {
         fetchSystemStats();
@@ -121,6 +179,7 @@ const SystemDashboard = () => {
             setActiveView('settings');
             setSystemPassword('');
             setPasswordError('');
+            fetchBackupStats();
         } catch (err) {
             setPasswordError(err.response?.data?.detail || 'Incorrect password');
         }
@@ -226,6 +285,64 @@ const SystemDashboard = () => {
         setTimeout(() => setWhatsappMessage({ type: '', text: '' }), 3000);
     };
 
+    const triggerDownload = (blob, filename) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleFullBackup = async () => {
+        setBackupLoading(true);
+        setBackupMessage({ type: '', text: '' });
+        try {
+            const response = await api.get('/system/backup', { responseType: 'blob' });
+            const cd = response.headers['content-disposition'] || '';
+            const match = cd.match(/filename="?([^"]+)"?/);
+            const filename = match ? match[1] : 'ailexity_backup.json';
+            triggerDownload(response.data, filename);
+            setBackupMessage({ type: 'success', text: 'Full backup downloaded successfully.' });
+        } catch (err) {
+            setBackupMessage({ type: 'error', text: err.response?.data?.detail || 'Backup failed.' });
+        } finally {
+            setBackupLoading(false);
+        }
+    };
+
+    const handleAdminExport = async (adminId) => {
+        if (!adminId) {
+            setBackupMessage({ type: 'error', text: 'Select an admin to export.' });
+            return;
+        }
+        setBackupLoading(true);
+        setBackupMessage({ type: '', text: '' });
+        try {
+            const response = await api.get(`/system/backup/${adminId}`, { responseType: 'blob' });
+            const cd = response.headers['content-disposition'] || '';
+            const match = cd.match(/filename="?([^"]+)"?/);
+            const filename = match ? match[1] : `ailexity_export_${adminId}.json`;
+            triggerDownload(response.data, filename);
+            setBackupMessage({ type: 'success', text: 'Admin data exported successfully.' });
+        } catch (err) {
+            setBackupMessage({ type: 'error', text: err.response?.data?.detail || 'Export failed.' });
+        } finally {
+            setBackupLoading(false);
+        }
+    };
+
+    const fetchBackupStats = async () => {
+        try {
+            const res = await api.get('/system/backup-stats');
+            setBackupStats(res.data);
+        } catch {
+            // non-critical
+        }
+    };
+
     // Load WhatsApp template from localStorage on mount
     useEffect(() => {
         const savedTemplate = localStorage.getItem('whatsapp_template');
@@ -240,8 +357,6 @@ const SystemDashboard = () => {
 
     const handleAddUser = async (e) => {
         e.preventDefault();
-        console.log('Create User button clicked');
-        console.log('Form Data:', formData);
         setError('');
         setLoading(true);
         try {
@@ -252,7 +367,6 @@ const SystemDashboard = () => {
                 return;
             }
 
-            // Build API payload: required fields + optional only if non-empty; coerce numbers
             const payload = {
                 username: formData.username?.trim() || '',
                 password: formData.password || '',
@@ -265,11 +379,10 @@ const SystemDashboard = () => {
                 business_type: normalizedBusinessType || null,
                 tax_id: formData.tax_id?.trim() || null,
                 tax_rate: formData.tax_rate === '' || formData.tax_rate == null ? 0 : Number(formData.tax_rate),
-                subscription_status: formData.subscription_status || 'active'
+                subscription_status: formData.subscription_status || 'active',
+                whatsapp_from_display: formData.whatsapp_from_display?.trim() || null,
             };
-            console.log('Sending request to create user...');
-            const response = await api.post('/users/', payload);
-            console.log('User created successfully:', response.data);
+            await api.post('/users/', payload);
             setShowAddModal(false);
             setFormData({
                 username: '',
@@ -287,8 +400,6 @@ const SystemDashboard = () => {
             });
             fetchSystemStats();
         } catch (err) {
-            console.error('Error creating user:', err);
-            console.error('Error response:', err.response);
             setError(err.response?.data?.detail || 'Failed to create user');
         } finally {
             setLoading(false);
@@ -298,9 +409,11 @@ const SystemDashboard = () => {
     const handleEditUser = (user) => {
         setEditingUser({
             ...user,
-            password: '', // Don't populate password
+            password: '',
             enable_multi_device_sync: user.enable_multi_device_sync || false,
-            enable_order_management: user.enable_order_management || false
+            enable_order_management: user.enable_order_management || false,
+            active_window_start: user.active_window_start || '',
+            active_window_end: user.active_window_end || '',
         });
         setShowEditModal(true);
         setError('');
@@ -319,8 +432,7 @@ const SystemDashboard = () => {
             }
 
             const payload = {
-                username: editingUser.username?.trim() || '',
-                password: editingUser.password || '', // Only send if changed
+                username: editingUser.username?.trim() || undefined,
                 role: editingUser.role || 'admin',
                 business_name: editingUser.business_name?.trim() || null,
                 phone: editingUser.phone?.trim() || null,
@@ -331,16 +443,18 @@ const SystemDashboard = () => {
                 tax_id: editingUser.tax_id?.trim() || null,
                 tax_rate: editingUser.tax_rate === '' || editingUser.tax_rate == null ? 0 : Number(editingUser.tax_rate),
                 subscription_status: editingUser.subscription_status || 'active',
+                active_window_start: editingUser.active_window_start || null,
+                active_window_end: editingUser.active_window_end || null,
                 enable_multi_device_sync: editingUser.enable_multi_device_sync || false,
-                enable_order_management: editingUser.enable_order_management || false
+                enable_order_management: editingUser.enable_order_management || false,
             };
-            
+            if (editingUser.password) payload.password = editingUser.password;
+
             await api.put(`/users/${editingUser.id}`, payload);
             setShowEditModal(false);
             setEditingUser(null);
             fetchSystemStats();
         } catch (err) {
-            console.error('Error updating user:', err);
             setError(err.response?.data?.detail || 'Failed to update user');
         } finally {
             setLoading(false);
@@ -410,50 +524,41 @@ const SystemDashboard = () => {
 
     if (loading) {
         return (
-            <div className="page-container with-mobile-header-offset">
+            <div className="page-container with-mobile-header-offset sysadmin-page">
                 <PageLoader message="Loading system statistics..." />
             </div>
         );
     }
 
     return (
-        <div className="page-container with-mobile-header-offset">
-            {/* Header */}
-            <div className="header-section">
-                <div className="flex items-center gap-3">
-                    <div style={{ width: '40px', height: '40px', background: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <BarChart3 size={24} color="white" />
-                    </div>
-                    <div>
-                        <h1>System Dashboard</h1>
-                        <p className="text-muted text-sm">Overview of all system activities and users</p>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <button 
-                        className="btn" 
-                        style={{ 
-                            background: activeView === 'settings' ? '#6366f1' : 'white',
-                            color: activeView === 'settings' ? 'white' : '#6366f1',
-                            border: '1px solid #6366f1'
-                        }}
-                        onClick={() => {
-                            setShowPasswordPrompt(true);
-                            setPasswordError('');
-                            setSystemPassword('');
-                        }}
-                    >
-                        <Settings size={18} />
-                        System Settings
+        <div className="page-container with-mobile-header-offset sysadmin-page" style={{ background: '#f8fafc' }}>
+            <PageHeader
+                icon={BarChart3}
+                title="System Dashboard"
+                subtitle="Overview of system activity and configuration"
+            >
+                <button
+                    className="btn"
+                    onClick={() => {
+                        setShowPasswordPrompt(true);
+                        setPasswordError('');
+                        setSystemPassword('');
+                    }}
+                >
+                    <Settings size={18} />
+                    System Settings
+                </button>
+                <button className="btn" onClick={() => { setActiveView('attendees'); setError(''); fetchAttendees(); }}>
+                    <Users size={18} />
+                    Attendees
+                </button>
+                {activeView === 'overview' && (
+                    <button className="btn" onClick={() => { setShowAddModal(true); setError(''); }}>
+                        <UserPlus size={18} />
+                        Add New User
                     </button>
-                    {activeView === 'overview' && (
-                        <button className="btn" onClick={() => { setShowAddModal(true); setError(''); }}>
-                            <UserPlus size={18} />
-                            Add New User
-                        </button>
-                    )}
-                </div>
-            </div>
+                )}
+            </PageHeader>
 
             {/* Content Area */}
             <div className="content-area">
@@ -856,36 +961,107 @@ const SystemDashboard = () => {
                             </div>
                         </div>
 
-                        {/* Database Management Section */}
-                        <div className="card">
+                        {/* Database Backup Section */}
+                        <div className="card mb-6">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
                                 <div style={{ width: '40px', height: '40px', background: '#dcfce7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Database size={20} color="#16a34a" />
                                 </div>
                                 <div>
-                                    <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>Database Management</h2>
-                                    <p className="text-muted text-sm">Backup and maintenance operations</p>
+                                    <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>Database Backup & Export</h2>
+                                    <p className="text-muted text-sm">Download JSON backups of all data. Passwords are never included.</p>
                                 </div>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                                <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                                    <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#1e293b' }}>Create Backup</h4>
-                                    <p className="text-muted text-xs mb-3">Generate a full database backup</p>
-                                    <button className="btn" style={{ width: '100%', fontSize: '13px', padding: '8px' }}>Backup Now</button>
+                            {backupMessage.text && (
+                                <div className={`mb-4 p-3 rounded-lg ${backupMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                                    {backupMessage.text}
+                                </div>
+                            )}
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+                                {/* Full System Backup */}
+                                <div style={{ padding: '20px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                        <Download size={16} color="#16a34a" />
+                                        <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#15803d', margin: 0 }}>Full System Backup</h4>
+                                    </div>
+                                    <p className="text-muted text-xs mb-3">Exports all users, invoices, items, stock, parties and more across all tenants into one JSON file.</p>
+                                    {backupStats && (
+                                        <div style={{ marginBottom: '12px', fontSize: '12px', color: '#166534' }}>
+                                            {Object.entries(backupStats)
+                                                .filter(([k]) => k !== 'total')
+                                                .map(([k, v]) => (
+                                                    <span key={k} style={{ marginRight: '10px' }}>{k}: <strong>{v}</strong></span>
+                                                ))}
+                                        </div>
+                                    )}
+                                    <button
+                                        className="btn"
+                                        style={{ width: '100%', fontSize: '13px', padding: '8px', background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                        onClick={handleFullBackup}
+                                        disabled={backupLoading}
+                                    >
+                                        <Download size={14} />
+                                        {backupLoading ? 'Preparing…' : 'Download Full Backup'}
+                                    </button>
                                 </div>
 
+                                {/* Per-Admin Export */}
                                 <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                                    <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#1e293b' }}>Database Stats</h4>
-                                    <p className="text-muted text-xs mb-1">Total Users: {stats.totalUsers}</p>
-                                    <p className="text-muted text-xs mb-1">Total Invoices: {stats.totalInvoices}</p>
-                                    <p className="text-muted text-xs">Total Items: {stats.totalItems}</p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                        <Download size={16} color="#3b82f6" />
+                                        <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#1e40af', margin: 0 }}>Export Admin Data</h4>
+                                    </div>
+                                    <p className="text-muted text-xs mb-3">Export all data for a specific admin — invoices, items, stock, parties, sub-users.</p>
+                                    <select
+                                        className="input"
+                                        style={{ width: '100%', marginBottom: '10px', fontSize: '13px' }}
+                                        value={backupAdminId}
+                                        onChange={e => setBackupAdminId(e.target.value)}
+                                    >
+                                        <option value="">— Select admin —</option>
+                                        {users.filter(u => u.role === 'admin').map(u => (
+                                            <option key={u.id} value={u.id}>
+                                                {u.business_name || u.username} ({u.username})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        className="btn"
+                                        style={{ width: '100%', fontSize: '13px', padding: '8px', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                        onClick={() => handleAdminExport(backupAdminId)}
+                                        disabled={backupLoading || !backupAdminId}
+                                    >
+                                        <Download size={14} />
+                                        {backupLoading ? 'Preparing…' : 'Export Admin Data'}
+                                    </button>
                                 </div>
 
-                                <div style={{ padding: '20px', background: '#fef2f2', borderRadius: '8px', border: '1px solid #fee2e2' }}>
-                                    <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#991b1b' }}>Optimize Database</h4>
-                                    <p className="text-muted text-xs mb-3">Clean and optimize database</p>
-                                    <button className="btn" style={{ width: '100%', fontSize: '13px', padding: '8px', background: '#ef4444' }}>Optimize</button>
+                                {/* Collection Stats */}
+                                <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                        <Database size={16} color="#6366f1" />
+                                        <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b', margin: 0 }}>Collection Counts</h4>
+                                    </div>
+                                    {backupStats ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            {Object.entries(backupStats)
+                                                .filter(([k]) => k !== 'total')
+                                                .map(([k, v]) => (
+                                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                                                        <span style={{ color: '#64748b', textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</span>
+                                                        <strong style={{ color: '#1e293b' }}>{v.toLocaleString()}</strong>
+                                                    </div>
+                                                ))}
+                                            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700 }}>
+                                                <span>Total documents</span>
+                                                <span style={{ color: '#6366f1' }}>{backupStats.total?.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-muted text-xs">Stats load when you enter this section.</p>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1222,6 +1398,7 @@ const SystemDashboard = () => {
                                     <th>Total Revenue</th>
                                     <th>Invoices</th>
                                     <th>Items</th>
+                                    <th>Verification</th>
                                     <th>Subscription</th>
                                 </tr>
                             </thead>
@@ -1264,6 +1441,26 @@ const SystemDashboard = () => {
                                                 {u.role === 'admin' ? u.totalItems : '-'}
                                             </td>
                                             <td>
+                                                {u.role === 'admin' ? (
+                                                    u.is_verified ? (
+                                                        <span className="badge bg-green-500">Verified</span>
+                                                    ) : (
+                                                        <button
+                                                            className="btn-icon success"
+                                                            title="Mark admin as verified"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                handleVerifyUser(u.id);
+                                                            }}
+                                                        >
+                                                            <CheckCircle size={16} />
+                                                        </button>
+                                                    )
+                                                ) : (
+                                                    <span className="text-xs text-muted">Not required</span>
+                                                )}
+                                            </td>
+                                            <td>
                                                 <span className={`badge ${u.subscription_status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}>
                                                     {u.subscription_status || 'Active'}
                                                 </span>
@@ -1271,7 +1468,7 @@ const SystemDashboard = () => {
                                         </tr>
                                         {expandedUser === u.id && (
                                             <tr>
-                                                <td colSpan="7" style={{ padding: 0, background: '#f9fafb' }}>
+                                                <td colSpan="8" style={{ padding: 0, background: '#f9fafb' }}>
                                                     <div style={{ padding: '24px', borderTop: '2px solid #e5e7eb' }}>
                                                         {/* Header with User Info */}
                                                         <div style={{ 
@@ -1541,28 +1738,50 @@ const SystemDashboard = () => {
                                                             display: 'flex',
                                                             justifyContent: 'flex-end'
                                                         }}>
-                                                            <button
-                                                                onClick={() => handleEditUser(u)}
-                                                                style={{
-                                                                    padding: '10px 20px',
-                                                                    background: '#6366f1',
-                                                                    color: 'white',
-                                                                    border: 'none',
-                                                                    borderRadius: '6px',
-                                                                    fontSize: '14px',
-                                                                    fontWeight: '500',
-                                                                    cursor: 'pointer',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '8px',
-                                                                    transition: 'all 0.2s'
-                                                                }}
-                                                                onMouseEnter={(e) => e.target.style.background = '#4f46e5'}
-                                                                onMouseLeave={(e) => e.target.style.background = '#6366f1'}
-                                                            >
-                                                                <Settings size={16} />
-                                                                Edit User
-                                                            </button>
+                                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                                {u.role === 'admin' && (
+                                                                    <button
+                                                                        onClick={() => handleAdminExport(u.id)}
+                                                                        disabled={backupLoading}
+                                                                        style={{
+                                                                            padding: '10px 20px',
+                                                                            background: '#16a34a',
+                                                                            color: 'white',
+                                                                            border: 'none',
+                                                                            borderRadius: '6px',
+                                                                            fontSize: '14px',
+                                                                            fontWeight: '500',
+                                                                            cursor: backupLoading ? 'not-allowed' : 'pointer',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '8px',
+                                                                            opacity: backupLoading ? 0.7 : 1,
+                                                                        }}
+                                                                    >
+                                                                        <Download size={16} />
+                                                                        Export Data
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => handleEditUser(u)}
+                                                                    style={{
+                                                                        padding: '10px 20px',
+                                                                        background: '#6366f1',
+                                                                        color: 'white',
+                                                                        border: 'none',
+                                                                        borderRadius: '6px',
+                                                                        fontSize: '14px',
+                                                                        fontWeight: '500',
+                                                                        cursor: 'pointer',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '8px',
+                                                                    }}
+                                                                >
+                                                                    <Settings size={16} />
+                                                                    Edit User
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -1641,9 +1860,9 @@ const SystemDashboard = () => {
 
             {/* System Settings Password Prompt */}
             {showPasswordPrompt && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-                    <div className="card" style={{ maxWidth: '400px', width: '100%' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+                    <div className="card" style={{ maxWidth: '420px', width: '100%', padding: '2rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem' }}>
                             <div style={{ width: '40px', height: '40px', background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Lock size={20} color="#f59e0b" />
                             </div>
@@ -1654,18 +1873,18 @@ const SystemDashboard = () => {
                         </div>
 
                         {passwordError && (
-                            <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 border border-red-200">
-                                {passwordError}
+                            <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <AlertCircle size={18} />
+                                <span>{passwordError}</span>
                             </div>
                         )}
 
                         <form onSubmit={handlePasswordSubmit}>
-                            <div style={{ marginBottom: '20px' }}>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#64748b', marginBottom: '8px' }}>Password</label>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium mb-2">Password</label>
                                 <input
                                     type="password"
                                     className="input"
-                                    style={{ width: '100%' }}
                                     value={systemPassword}
                                     onChange={e => setSystemPassword(e.target.value)}
                                     placeholder="Enter system password"
@@ -1673,7 +1892,13 @@ const SystemDashboard = () => {
                                 />
                             </div>
 
-                            <div style={{ display: 'flex', gap: '12px' }}>
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary w-full"
+                                >
+                                    Access Admin Settings
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -1681,29 +1906,14 @@ const SystemDashboard = () => {
                                         setPasswordError('');
                                         setSystemPassword('');
                                     }}
-                                    style={{
-                                        flex: 1,
-                                        padding: '10px 24px',
-                                        border: '1px solid #e2e8f0',
-                                        borderRadius: '6px',
-                                        fontSize: '14px',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                        backgroundColor: 'white',
-                                        color: '#64748b'
-                                    }}
+                                    className="btn btn-secondary w-full"
                                 >
                                     Cancel
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="btn"
-                                    style={{ flex: 1 }}
-                                >
-                                    Access
-                                </button>
                             </div>
                         </form>
+
+                        <p className="text-xs text-muted mt-4 text-center">🔒 This section is protected by system password</p>
                     </div>
                 </div>
             )}
@@ -1942,6 +2152,18 @@ const SystemDashboard = () => {
                                             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                         />
                                     </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#64748b', marginBottom: '8px' }}>WhatsApp Business Number</label>
+                                        <input
+                                            className="input"
+                                            type="text"
+                                            style={{ width: '100%' }}
+                                            placeholder="+919876543210"
+                                            value={formData.whatsapp_from_display}
+                                            onChange={(e) => setFormData({ ...formData, whatsapp_from_display: e.target.value })}
+                                        />
+                                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8' }}>The number invoices will be sent FROM (WhatsApp Business API)</p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -2114,6 +2336,28 @@ const SystemDashboard = () => {
                                                 <option value="inactive">Inactive</option>
                                                 <option value="trial">Trial</option>
                                             </select>
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#64748b', marginBottom: '8px' }}>Access Start Date</label>
+                                            <input
+                                                className="input"
+                                                type="date"
+                                                style={{ width: '100%' }}
+                                                value={editingUser.active_window_start || ''}
+                                                onChange={(e) => setEditingUser({ ...editingUser, active_window_start: e.target.value })}
+                                            />
+                                            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8' }}>Leave blank for no restriction</p>
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#64748b', marginBottom: '8px' }}>Access End Date</label>
+                                            <input
+                                                className="input"
+                                                type="date"
+                                                style={{ width: '100%' }}
+                                                value={editingUser.active_window_end || ''}
+                                                onChange={(e) => setEditingUser({ ...editingUser, active_window_end: e.target.value })}
+                                            />
+                                            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8' }}>Leave blank for no expiry</p>
                                         </div>
                                     </div>
                                 </div>

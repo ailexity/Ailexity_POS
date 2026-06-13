@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { Search, Printer, MessageSquare, X, RefreshCw, ShoppingBag } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import PageLoader from '../components/PageLoader';
@@ -16,14 +14,6 @@ const OrderManagement = () => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [filterType, setFilterType] = useState('all');
     const [sortBy, setSortBy] = useState('newest');
-    const { user } = useAuth();
-    const navigate = useNavigate();
-
-    useEffect(() => {
-        if (user && !user.enable_order_management) {
-            navigate('/');
-        }
-    }, [user, navigate]);
 
     useEffect(() => {
         fetchOrders();

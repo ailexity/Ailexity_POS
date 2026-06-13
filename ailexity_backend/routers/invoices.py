@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse
+from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from pymongo.database import Database
 from bson import ObjectId
@@ -29,6 +29,18 @@ WALK_IN_LABELS = {
     "cash customer",
     "cash sale",
 }
+
+
+def _parse_filter_date(date_value: Optional[str], end_of_day: bool = False):
+    if not date_value:
+        return None
+    try:
+        parsed = datetime.strptime(date_value, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Dates must use YYYY-MM-DD format")
+    if end_of_day:
+        return parsed + timedelta(days=1)
+    return parsed
 
 
 def _is_walk_in_customer(customer_name: str) -> bool:
@@ -204,20 +216,49 @@ def _get_public_invoice_data(invoice_id: str, db: Database):
 
 @router.get("/", response_model=List[schemas.InvoiceResponse])
 def read_invoices(
-    skip: int = 0, 
-    limit: int = 100, 
+    response: Response,
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: Database = Depends(database.get_db), 
     current_user: dict = Depends(auth.get_current_active_user)
 ):
     """Get invoices - filtered by admin_id for multi-tenant isolation"""
+    query = {}
+    if current_user.get("role") != 'sysadmin':
+        query["admin_id"] = current_user["id"]
+
+    if search:
+        search_text = search.strip()
+        if search_text:
+            query["$or"] = [
+                {"invoice_number": {"$regex": search_text, "$options": "i"}},
+                {"customer_name": {"$regex": search_text, "$options": "i"}},
+                {"customer_phone": {"$regex": search_text, "$options": "i"}},
+                {"table_name": {"$regex": search_text, "$options": "i"}},
+            ]
+
+    start_dt = _parse_filter_date(start_date)
+    end_dt = _parse_filter_date(end_date, end_of_day=True)
+    if start_dt or end_dt:
+        date_filter = {}
+        if start_dt:
+            date_filter["$gte"] = start_dt
+        if end_dt:
+            date_filter["$lt"] = end_dt
+        query["created_at"] = date_filter
+
+    total_count = database.invoices_collection.count_documents(query)
+    response.headers["X-Total-Count"] = str(total_count)
+
     if current_user.get("role") == 'sysadmin':
         # SysAdmin can see all invoices
-        invoices = list(database.invoices_collection.find({}).sort("created_at", -1).skip(skip).limit(limit))
+        invoices = list(database.invoices_collection.find(query).sort("created_at", -1).skip(skip).limit(limit))
     else:
         # Admin sees only their own invoices
-        invoices = list(database.invoices_collection.find(
-            {"admin_id": current_user["id"]}
-        ).sort("created_at", -1).skip(skip).limit(limit))
+        invoices = list(database.invoices_collection.find(query).sort("created_at", -1).skip(skip).limit(limit))
     
     # Enrich invoices with admin store details
     result = []
@@ -404,106 +445,133 @@ def get_statistics(
     db: Database = Depends(database.get_db),
     current_user: dict = Depends(auth.get_current_active_user)
 ):
-    """Get dashboard statistics - optimized endpoint"""
+    """Get dashboard statistics using MongoDB aggregation for performance."""
     try:
-        if current_user.get("role") == 'sysadmin':
-            invoices = list(database.invoices_collection.find({}))
-            items = list(database.items_collection.find({}))
-        else:
-            invoices = list(database.invoices_collection.find({"admin_id": current_user["id"]}))
-            items = list(database.items_collection.find({"admin_id": current_user["id"]}))
-        
-        # Helper function to safely parse datetime - make timezone-naive for comparison
-        def parse_invoice_date(inv):
-            try:
-                created_at = inv.get('created_at')
-                if isinstance(created_at, datetime):
-                    # Remove timezone info for comparison
-                    return created_at.replace(tzinfo=None) if created_at.tzinfo else created_at
-                elif isinstance(created_at, str):
-                    # Handle ISO format with or without 'Z'
-                    date_str = created_at.replace('Z', '+00:00')
-                    dt = datetime.fromisoformat(date_str)
-                    # Remove timezone info
-                    return dt.replace(tzinfo=None)
-                else:
-                    return datetime.now()
-            except Exception as e:
-                return datetime.now()
-        
-        # Calculate statistics
-        total_revenue = sum(inv.get('total_amount', 0) for inv in invoices)
-        
-        # Use timezone-naive datetime for comparison
+        match = {} if current_user.get("role") == 'sysadmin' else {"admin_id": current_user["id"]}
+
         now = datetime.now()
         today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        
-        # Today's stats - compare timezone-naive datetimes
-        today_invoices = [inv for inv in invoices if parse_invoice_date(inv) >= today]
-        today_revenue = sum(inv.get('total_amount', 0) for inv in today_invoices)
-        
-        # Yesterday's stats
         yesterday = today - timedelta(days=1)
-        yesterday_invoices = [inv for inv in invoices if yesterday <= parse_invoice_date(inv) < today]
-        yesterday_revenue = sum(inv.get('total_amount', 0) for inv in yesterday_invoices)
-        
-        # Week stats
         week_start = today - timedelta(days=today.weekday())
-        week_invoices = [inv for inv in invoices if parse_invoice_date(inv) >= week_start]
-        week_revenue = sum(inv.get('total_amount', 0) for inv in week_invoices)
-        
-        # Month stats
         month_start = today.replace(day=1)
-        month_invoices = [inv for inv in invoices if parse_invoice_date(inv) >= month_start]
-        month_revenue = sum(inv.get('total_amount', 0) for inv in month_invoices)
-        
-        # Low stock items
-        low_stock_items = len([item for item in items if item.get('limit_stock') and item.get('stock_quantity', 0) < 10])
-        
-        # Payment modes
-        payment_modes = {}
-        for inv in invoices:
-            mode = inv.get('payment_mode', 'Cash')
-            payment_modes[mode] = payment_modes.get(mode, 0) + 1
-        
-        # Hourly data for today
+
+        # Use $facet to compute multiple aggregates in a single pipeline
+        facet = {
+            "totals": [
+                {"$group": {"_id": None, "totalRevenue": {"$sum": "$total_amount"}, "totalOrders": {"$sum": 1}, "avgOrderValue": {"$avg": "$total_amount"}}}
+            ],
+            "today": [
+                {"$match": {"created_at": {"$gte": today}}},
+                {"$group": {"_id": None, "todayRevenue": {"$sum": "$total_amount"}, "todayOrders": {"$sum": 1}}}
+            ],
+            "yesterday": [
+                {"$match": {"created_at": {"$gte": yesterday, "$lt": today}}},
+                {"$group": {"_id": None, "yesterdayRevenue": {"$sum": "$total_amount"}, "yesterdayOrders": {"$sum": 1}}}
+            ],
+            "week": [
+                {"$match": {"created_at": {"$gte": week_start}}},
+                {"$group": {"_id": None, "weekRevenue": {"$sum": "$total_amount"}, "weekOrders": {"$sum": 1}}}
+            ],
+            "month": [
+                {"$match": {"created_at": {"$gte": month_start}}},
+                {"$group": {"_id": None, "monthRevenue": {"$sum": "$total_amount"}, "monthOrders": {"$sum": 1}}}
+            ],
+            "paymentModes": [
+                {"$group": {"_id": "$payment_mode", "count": {"$sum": 1}, "value": {"$sum": "$total_amount"}}},
+                {"$sort": {"value": -1}}
+            ],
+            "hourly": [
+                {"$match": {"created_at": {"$gte": today}}},
+                {"$project": {"hour": {"$hour": "$created_at"}, "amount": "$total_amount"}},
+                {"$group": {"_id": "$hour", "sum": {"$sum": "$amount"}}},
+                {"$sort": {"_id": 1}}
+            ],
+            "profit": [
+                {"$unwind": {"path": "$items", "preserveNullAndEmptyArrays": True}},
+                {"$group": {"_id": None, "profit": {"$sum": {"$ifNull": ["$items.profit", 0]}}}}
+            ]
+        }
+
+        pipeline = [{"$match": match}, {"$facet": facet}]
+        agg = list(database.invoices_collection.aggregate(pipeline, allowDiskUse=True))
+
+        # Defaults
+        total_revenue = 0
+        total_orders = 0
+        avg_order_value = 0
+        today_revenue = 0
+        today_orders = 0
+        yesterday_revenue = 0
+        yesterday_orders = 0
+        week_revenue = 0
+        week_orders = 0
+        month_revenue = 0
+        month_orders = 0
         hourly_data = [0] * 24
-        for inv in today_invoices:
-            try:
-                inv_dt = parse_invoice_date(inv)
-                hour = inv_dt.hour
-                hourly_data[hour] += inv.get('total_amount', 0)
-            except Exception:
-                continue
-        
-        # Calculate profit for today and month
-        def calculate_profit(invoices):
-            total_profit = 0.0
-            for inv in invoices:
-                items = inv.get('items', [])
-                for item in items:
-                    # Get profit from item (already calculated in InvoiceItemDocument)
-                    total_profit += item.get('profit', 0.0)
-            return total_profit
-        
-        today_profit = calculate_profit(today_invoices)
-        month_profit = calculate_profit(month_invoices)
-        
+        payment_modes = {}
+        profit_val = 0
+
+        if agg:
+            res = agg[0]
+            totals = res.get('totals', [])
+            if totals:
+                total_revenue = totals[0].get('totalRevenue', 0) or 0
+                total_orders = int(totals[0].get('totalOrders', 0) or 0)
+                avg_order_value = totals[0].get('avgOrderValue', 0) or 0
+
+            today_arr = res.get('today', [])
+            if today_arr:
+                today_revenue = today_arr[0].get('todayRevenue', 0) or 0
+                today_orders = int(today_arr[0].get('todayOrders', 0) or 0)
+
+            yesterday_arr = res.get('yesterday', [])
+            if yesterday_arr:
+                yesterday_revenue = yesterday_arr[0].get('yesterdayRevenue', 0) or 0
+                yesterday_orders = int(yesterday_arr[0].get('yesterdayOrders', 0) or 0)
+
+            week_arr = res.get('week', [])
+            if week_arr:
+                week_revenue = week_arr[0].get('weekRevenue', 0) or 0
+                week_orders = int(week_arr[0].get('weekOrders', 0) or 0)
+
+            month_arr = res.get('month', [])
+            if month_arr:
+                month_revenue = month_arr[0].get('monthRevenue', 0) or 0
+                month_orders = int(month_arr[0].get('monthOrders', 0) or 0)
+
+            for pm in res.get('paymentModes', []):
+                key = pm.get('_id') if pm.get('_id') is not None else 'Unknown'
+                payment_modes[key] = pm.get('value', pm.get('count', 0))
+
+            for h in res.get('hourly', []):
+                idx = int(h.get('_id') or 0)
+                if 0 <= idx < 24:
+                    hourly_data[idx] = h.get('sum', 0)
+
+            profit_arr = res.get('profit', [])
+            if profit_arr:
+                profit_val = profit_arr[0].get('profit', 0) or 0
+
+        # Items counts computed via fast count queries
+        item_match = {} if current_user.get("role") == 'sysadmin' else {"admin_id": current_user["id"]}
+        total_items = database.items_collection.count_documents(item_match)
+        low_stock_items = database.items_collection.count_documents({**item_match, "limit_stock": True, "stock_quantity": {"$lt": 10}})
+
         return {
             "totalRevenue": total_revenue,
-            "totalOrders": len(invoices),
-            "totalItems": len(items),
-            "avgOrderValue": total_revenue / len(invoices) if invoices else 0,
+            "totalOrders": total_orders,
+            "totalItems": total_items,
+            "avgOrderValue": avg_order_value,
             "todayRevenue": today_revenue,
-            "todayOrders": len(today_invoices),
-            "todayProfit": today_profit,
+            "todayOrders": today_orders,
+            "todayProfit": profit_val,
             "yesterdayRevenue": yesterday_revenue,
-            "yesterdayOrders": len(yesterday_invoices),
+            "yesterdayOrders": yesterday_orders,
             "weekRevenue": week_revenue,
-            "weekOrders": len(week_invoices),
+            "weekOrders": week_orders,
             "monthRevenue": month_revenue,
-            "monthOrders": len(month_invoices),
-            "monthProfit": month_profit,
+            "monthOrders": month_orders,
+            "monthProfit": profit_val,
             "lowStockItems": low_stock_items,
             "paymentModes": payment_modes,
             "hourlyData": hourly_data
@@ -512,7 +580,6 @@ def get_statistics(
         print(f"Error in statistics endpoint: {e}")
         import traceback
         traceback.print_exc()
-        # Return empty statistics on error
         return {
             "totalRevenue": 0,
             "totalOrders": 0,

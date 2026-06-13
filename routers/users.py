@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Form
-from typing import List, Optional
+from typing import Dict, List, Optional
 from pymongo.database import Database
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
@@ -26,6 +26,25 @@ def _normalize_business_type(value: Optional[str]) -> Optional[str]:
         return "restaurant"
     return None
 
+def _validate_tenant_feature_login(user: dict, db: Database):
+    if user.get("role") not in ["attendee", "kitchen"]:
+        return
+
+    admin_id = user.get("admin_id")
+    if not admin_id or not ObjectId.is_valid(admin_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unable to verify tenant admin permissions.")
+
+    admin = database.users_collection.find_one({"_id": ObjectId(admin_id)})
+    if not admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant admin account not found.")
+
+    features = admin.get("features", {})
+    if user.get("role") == "kitchen" and not features.get("kot_printing", True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Kitchen user login is disabled by the admin.")
+    if user.get("role") == "attendee" and not features.get("attendees_management", True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Attendee login is disabled by the admin.")
+
+
 @router.post("/token", response_model=schemas.Token, summary="Login (OAuth2)")
 async def login_for_access_token(
     username: str = Form(...),
@@ -40,6 +59,8 @@ async def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    _validate_tenant_feature_login(user, db)
     
     if user.get("subscription_status") == 'inactive':
         raise HTTPException(
@@ -79,7 +100,7 @@ async def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/users/", response_model=schemas.UserResponse)
-def create_user(user: schemas.UserCreate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+def create_user(user: schemas.UserCreate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):
     db_user = database.users_collection.find_one({"username": user.username})
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -112,7 +133,8 @@ def create_user(user: schemas.UserCreate, db: Database = Depends(database.get_db
         active_window_start=user.active_window_start,
         active_window_end=user.active_window_end,
         enable_multi_device_sync=user.enable_multi_device_sync if user.enable_multi_device_sync is not None else False,
-        enable_order_management=user.enable_order_management if user.enable_order_management is not None else False
+        enable_order_management=user.enable_order_management if user.enable_order_management is not None else False,
+        features=user.features
     )
     result = database.users_collection.insert_one(new_user)
     new_user["_id"] = result.inserted_id
@@ -159,10 +181,7 @@ def update_me(user_update: schemas.UserUpdateProfile, db: Database = Depends(dat
     if user_update.business_address is not None:
         update_data["business_address"] = user_update.business_address
     if user_update.business_type is not None:
-        normalized_business_type = _normalize_business_type(user_update.business_type)
-        if user_update.business_type.strip() and normalized_business_type is None:
-            raise HTTPException(status_code=400, detail="business_type must be either restaurant or retailer")
-        update_data["business_type"] = normalized_business_type
+        raise HTTPException(status_code=403, detail="business_type can only be changed by sysadmin")
     if user_update.tax_id is not None:
         update_data["tax_id"] = user_update.tax_id
     if user_update.tax_rate is not None:
@@ -200,49 +219,276 @@ def get_all_users(db: Database = Depends(database.get_db), current_user: dict = 
     users = list(database.users_collection.find({}))
     return serialize_docs(users)
 
-@router.put("/users/{user_id}", response_model=schemas.UserResponse)
-def update_user(user_id: str, user_update: schemas.UserCreate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):
-    """Update user - System Admin only"""
+@router.get("/users/{user_id}", response_model=schemas.UserResponse)
+def get_user(user_id: str, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):
+    """Get a single user by ID - System Admin only"""
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID")
     db_user = database.users_collection.find_one({"_id": ObjectId(user_id)})
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # Check if username is being changed and if it's already taken
-    if user_update.username != db_user["username"]:
-        existing_user = database.users_collection.find_one({"username": user_update.username})
-        if existing_user:
-            raise HTTPException(status_code=400, detail="Username already taken")
-    
-    normalized_business_type = _normalize_business_type(user_update.business_type)
-    if user_update.role != "sysadmin" and normalized_business_type is None:
-        raise HTTPException(status_code=400, detail="business_type must be either restaurant or retailer")
+    return serialize_doc(db_user)
 
-    update_data = {
-        "username": user_update.username,
-        "role": user_update.role,
-        "business_name": user_update.business_name,
-        "phone": user_update.phone,
-        "email": user_update.email,
-        "full_name": user_update.full_name,
-        "business_address": user_update.business_address,
-        "business_type": normalized_business_type,
-        "tax_id": user_update.tax_id,
-        "tax_rate": user_update.tax_rate if user_update.tax_rate is not None else 0.0,
-        "subscription_status": user_update.subscription_status,
-        "active_window_start": user_update.active_window_start,
-        "active_window_end": user_update.active_window_end,
-        "enable_multi_device_sync": user_update.enable_multi_device_sync if user_update.enable_multi_device_sync is not None else False,
-        "enable_order_management": user_update.enable_order_management if user_update.enable_order_management is not None else False
-    }
-    
-    if user_update.password:  # Only update password if provided
-        update_data["hashed_password"] = auth.get_password_hash(user_update.password)
-    
+@router.patch("/users/{user_id}/status", response_model=schemas.UserResponse)
+def update_user_status(user_id: str, status_update: schemas.StatusUpdate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):
+    """Quickly toggle subscription_status - System Admin only"""
+    if status_update.subscription_status not in ("active", "inactive", "trial"):
+        raise HTTPException(status_code=400, detail="subscription_status must be 'active', 'inactive', or 'trial'")
+    db_user = database.users_collection.find_one({"_id": ObjectId(user_id)})
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if str(db_user["_id"]) == current_user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot change your own subscription status")
     database.users_collection.update_one(
         {"_id": ObjectId(user_id)},
-        {"$set": update_data}
+        {"$set": {"subscription_status": status_update.subscription_status}}
     )
-    
+    return serialize_doc(database.users_collection.find_one({"_id": ObjectId(user_id)}))
+
+@router.put("/users/{user_id}", response_model=schemas.UserResponse)
+def update_user(user_id: str, user_update: schemas.UserUpdateByAdmin, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):
+    """Update user - System Admin only. Only sends fields that are explicitly provided."""
+    db_user = database.users_collection.find_one({"_id": ObjectId(user_id)})
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update_data = {}
+
+    if user_update.username is not None and user_update.username != db_user["username"]:
+        if database.users_collection.find_one({"username": user_update.username}):
+            raise HTTPException(status_code=400, detail="Username already taken")
+        update_data["username"] = user_update.username
+
+    if user_update.role is not None:
+        update_data["role"] = user_update.role
+
+    if user_update.business_type is not None:
+        normalized = _normalize_business_type(user_update.business_type)
+        effective_role = user_update.role or db_user.get("role", "admin")
+        if effective_role != "sysadmin" and normalized is None:
+            raise HTTPException(status_code=400, detail="business_type must be 'restaurant' or 'retailer'")
+        update_data["business_type"] = normalized
+
+    for field in ("business_name", "phone", "email", "full_name", "business_address",
+                  "tax_id", "subscription_status", "active_window_start", "active_window_end",
+                  "whatsapp_from_display"):
+        val = getattr(user_update, field)
+        if val is not None:
+            update_data[field] = val
+
+    if user_update.tax_rate is not None:
+        update_data["tax_rate"] = user_update.tax_rate
+    if user_update.enable_multi_device_sync is not None:
+        update_data["enable_multi_device_sync"] = user_update.enable_multi_device_sync
+    if user_update.enable_order_management is not None:
+        update_data["enable_order_management"] = user_update.enable_order_management
+
+    if user_update.password:
+        update_data["hashed_password"] = auth.get_password_hash(user_update.password)
+
+    if user_update.features is not None:
+        update_data["features"] = user_update.features
+
+    if update_data:
+        database.users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": update_data})
+
+    return serialize_doc(database.users_collection.find_one({"_id": ObjectId(user_id)}))
+
+
+KNOWN_FEATURES = {
+    "stock_management": {"name": "Stock Management", "description": "Manage inventory and stock levels", "icon": "Package", "business_types": ["restaurant", "retailer"]},
+    "ledger_management": {"name": "Ledger Management", "description": "Access party ledger and accounting", "icon": "BookOpen", "business_types": ["retailer"]},
+    "parties_management": {"name": "Parties/Customers Management", "description": "Manage customer and supplier information", "icon": "Users", "business_types": ["retailer"]},
+    "items_management": {"name": "Items Management", "description": "Create and manage product items", "icon": "ShoppingCart", "business_types": ["restaurant"]},
+    "pos_billing": {"name": "POS Billing", "description": "Access to billing system", "icon": "CreditCard", "business_types": ["restaurant", "retailer"]},
+    "invoices": {"name": "Invoices", "description": "View and manage invoices", "icon": "FileText", "business_types": ["restaurant", "retailer"]},
+    "alerts": {"name": "Alerts Management", "description": "Configure and manage alerts", "icon": "Bell", "business_types": ["restaurant", "retailer"]},
+    "dashboard": {"name": "Dashboard", "description": "Access to analytics dashboard", "icon": "BarChart3", "business_types": ["restaurant", "retailer"]},
+    "admin_panel": {"name": "Admin Panel", "description": "Access to settings and admin controls", "icon": "Settings", "business_types": ["restaurant", "retailer"]},
+    "kot_printing": {"name": "KOT Printing", "description": "Kitchen Order Ticket printing functionality", "icon": "Printer", "business_types": ["restaurant"]},
+    "order_management": {"name": "Order Management", "description": "Manage and track online orders", "icon": "ClipboardList", "business_types": ["restaurant"]},
+    "payment_tracking": {"name": "Payment Tracking", "description": "Track payments and transactions", "icon": "DollarSign", "business_types": ["restaurant", "retailer"]},
+    "attendees_management": {"name": "Attendees Management", "description": "Create and manage attendee logins", "icon": "UserCheck", "business_types": ["restaurant", "retailer"]},
+}
+
+
+def _assert_can_manage_user(current_user: dict, target_user: dict):
+    """Admins may only manage their own sub-users; sysadmins can manage anyone."""
+    if current_user.get("role") == "sysadmin":
+        return
+    if target_user.get("admin_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not enough permissions to manage this user")
+
+
+@router.get("/users/{user_id}/features")
+async def get_user_features(
+    user_id: str,
+    db: Database = Depends(database.get_db),
+    current_user: dict = Depends(auth.get_admin_user)
+):
+    user = database.users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    _assert_can_manage_user(current_user, serialize_doc(dict(user)))
+
+    default_features = {k: True for k in KNOWN_FEATURES}
+    features = {**default_features, **user.get("features", {})}
+    # Only return keys that exist in KNOWN_FEATURES
+    features = {k: bool(v) for k, v in features.items() if k in KNOWN_FEATURES}
+
+    return {
+        "user_id": user_id,
+        "username": user.get("username"),
+        "business_type": user.get("business_type"),
+        "features": features,
+        "available_features": KNOWN_FEATURES,
+    }
+
+
+@router.put("/users/{user_id}/features")
+async def update_user_features(
+    user_id: str,
+    features_update: Dict[str, bool],
+    db: Database = Depends(database.get_db),
+    current_user: dict = Depends(auth.get_admin_user)
+):
+    user = database.users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    _assert_can_manage_user(current_user, serialize_doc(dict(user)))
+
+    unknown_keys = [k for k in features_update if k not in KNOWN_FEATURES]
+    if unknown_keys:
+        raise HTTPException(status_code=400, detail=f"Unknown feature keys: {unknown_keys}")
+
+    current_features = user.get("features", {})
+    updated_features = {**current_features, **features_update}
+    # Strip any keys not in KNOWN_FEATURES that may have crept in historically
+    updated_features = {k: bool(v) for k, v in updated_features.items() if k in KNOWN_FEATURES}
+
+    database.users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"features": updated_features}}
+    )
+
+    return {
+        "status": "success",
+        "message": "User features updated successfully",
+        "user_id": user_id,
+        "features": updated_features,
+    }
+
+
+@router.get("/admin/features-list")
+async def get_all_available_features(current_user: dict = Depends(auth.get_admin_user)):
+    return {
+        "available_features": KNOWN_FEATURES,
+        "total_features": len(KNOWN_FEATURES),
+    }
+
+
+@router.post("/attendees", response_model=schemas.AttendeeResponse)
+def create_attendee(attendee: schemas.AttendeeCreate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+    existing = database.users_collection.find_one({"username": attendee.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    hashed_password = auth.get_password_hash(attendee.password)
+    attendee_features = {
+        "pos_billing": True,
+        "invoices": False,
+        "dashboard": False,
+        "admin_panel": False,
+        "attendees_management": False,
+        "stock_management": False,
+        "ledger_management": False,
+        "parties_management": False,
+        "items_management": False,
+        "alerts": False,
+        "order_management": False,
+        "payment_tracking": False,
+        "kot_printing": False,
+    }
+    new_user = UserDocument.create(
+        username=attendee.username,
+        hashed_password=hashed_password,
+        role="attendee",
+        full_name=attendee.full_name,
+        phone=attendee.phone,
+        email=attendee.email,
+        features=attendee_features,
+    )
+    new_user["admin_id"] = current_user["id"]
+    res = database.users_collection.insert_one(new_user)
+    new_user["_id"] = res.inserted_id
+    database.users_collection.update_one({"_id": new_user["_id"]}, {"$set": {"is_verified": True}})
+    return serialize_doc(database.users_collection.find_one({"_id": new_user["_id"]}))
+
+
+@router.get("/attendees", response_model=List[schemas.AttendeeResponse])
+def list_attendees(db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+    query = {"role": "attendee"}
+    if current_user.get("role") != "sysadmin":
+        query["admin_id"] = current_user["id"]
+    docs = list(database.users_collection.find(query))
+    return serialize_docs(docs)
+
+
+@router.put("/attendees/{attendee_id}", response_model=schemas.AttendeeResponse)
+def update_attendee(attendee_id: str, attendee: schemas.AttendeeUpdate, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+    dbu = database.users_collection.find_one({"_id": ObjectId(attendee_id)})
+    if not dbu:
+        raise HTTPException(status_code=404, detail="Attendee not found")
+    if current_user.get("role") != "sysadmin" and dbu.get("admin_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    update_data = {}
+    if attendee.full_name is not None:
+        update_data["full_name"] = attendee.full_name
+    if attendee.phone is not None:
+        update_data["phone"] = attendee.phone
+    if attendee.email is not None:
+        update_data["email"] = attendee.email
+    if attendee.password:
+        update_data["hashed_password"] = auth.get_password_hash(attendee.password)
+    if attendee.active_window_start is not None:
+        update_data["active_window_start"] = attendee.active_window_start
+    if attendee.active_window_end is not None:
+        update_data["active_window_end"] = attendee.active_window_end
+    if attendee.features is not None:
+        update_data["features"] = attendee.features
+
+    if update_data:
+        database.users_collection.update_one({"_id": ObjectId(attendee_id)}, {"$set": update_data})
+    return serialize_doc(database.users_collection.find_one({"_id": ObjectId(attendee_id)}))
+
+
+@router.delete("/attendees/{attendee_id}")
+def delete_attendee(attendee_id: str, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_admin_user)):
+    dbu = database.users_collection.find_one({"_id": ObjectId(attendee_id)})
+    if not dbu:
+        raise HTTPException(status_code=404, detail="Attendee not found")
+    if current_user.get("role") != "sysadmin" and dbu.get("admin_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    database.users_collection.delete_one({"_id": ObjectId(attendee_id)})
+    return {"message": "Attendee removed"}
+
+
+@router.post("/users/{user_id}/verify", response_model=schemas.UserResponse)
+def verify_user_by_sysadmin(user_id: str, db: Database = Depends(database.get_db), current_user: dict = Depends(auth.get_sysadmin_user)):
+    """Allow sysadmin to approve an existing admin account for login."""
+    db_user = database.users_collection.find_one({"_id": ObjectId(user_id)})
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if db_user.get("role") != "admin":
+        raise HTTPException(status_code=400, detail="Only admin accounts require verification")
+
+    database.users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"is_verified": True}, "$unset": {"otp": "", "otp_expires": ""}}
+    )
     updated_user = database.users_collection.find_one({"_id": ObjectId(user_id)})
     return serialize_doc(updated_user)
 

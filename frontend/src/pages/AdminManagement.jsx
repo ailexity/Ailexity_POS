@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Users, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, AlertCircle, Search } from 'lucide-react';
+import { Users, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, AlertCircle, Search, Settings, CheckCircle, X } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import PageLoader from '../components/PageLoader';
+import FeatureManagementModal from '../components/FeatureManagementModal';
 
 const normalizeBusinessType = (businessType) => {
     const value = String(businessType || '').toLowerCase();
@@ -20,6 +21,8 @@ const AdminManagement = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [featureUser, setFeatureUser] = useState(null);
+    const [showFeatureModal, setShowFeatureModal] = useState(false);
     const [formData, setFormData] = useState({
         username: '',
         password: '',
@@ -34,7 +37,24 @@ const AdminManagement = () => {
         tax_rate: '',
         subscription_status: 'active',
         active_window_start: '',
-        active_window_end: ''
+        active_window_end: '',
+        whatsapp_from_display: '',
+    });
+
+    const getKitchenUserFeatures = () => ({
+        stock_management: false,
+        ledger_management: false,
+        parties_management: false,
+        items_management: false,
+        pos_billing: false,
+        invoices: false,
+        alerts: false,
+        dashboard: false,
+        admin_panel: false,
+        kot_printing: true,
+        order_management: true,
+        payment_tracking: false,
+        attendees_management: false,
     });
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
@@ -105,6 +125,11 @@ const AdminManagement = () => {
                 business_type: normalizedBusinessType || formData.business_type,
             };
 
+            if (formData.role === 'kitchen') {
+                payload.business_type = payload.business_type || 'restaurant';
+                payload.features = getKitchenUserFeatures();
+            }
+
             await api.post('/users/', payload);
             setShowAddModal(false);
             setFormData({
@@ -121,7 +146,8 @@ const AdminManagement = () => {
                 tax_rate: '',
                 subscription_status: 'active',
                 active_window_start: '',
-                active_window_end: ''
+                active_window_end: '',
+                whatsapp_from_display: '',
             });
             fetchUsers();
         } catch (err) {
@@ -161,7 +187,8 @@ const AdminManagement = () => {
                 tax_rate: '',
                 subscription_status: 'active',
                 active_window_start: '',
-                active_window_end: ''
+                active_window_end: '',
+                whatsapp_from_display: '',
             });
             fetchUsers();
         } catch (err) {
@@ -177,6 +204,16 @@ const AdminManagement = () => {
             fetchUsers();
         } catch (err) {
             alert(err.response?.data?.detail || 'Failed to delete user');
+        }
+    };
+
+    const handleVerifyUser = async (userId) => {
+        setError('');
+        try {
+            await api.post(`/users/${userId}/verify`);
+            fetchUsers();
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Failed to verify user');
         }
     };
 
@@ -222,55 +259,59 @@ const AdminManagement = () => {
             tax_rate: user.tax_rate || 0,
             subscription_status: user.subscription_status || 'active',
             active_window_start: user.active_window_start || '',
-            active_window_end: user.active_window_end || ''
+            active_window_end: user.active_window_end || '',
+            whatsapp_from_display: user.whatsapp_from_display || '',
         });
         setShowEditModal(true);
         setError('');
     };
 
+    const openFeatureModal = (user) => {
+        setFeatureUser(user);
+        setShowFeatureModal(true);
+        setError('');
+    };
+
+    const closeFeatureModal = () => {
+        setShowFeatureModal(false);
+        setFeatureUser(null);
+    };
+
     if (loading) {
         return (
-            <div className="page-container with-mobile-header-offset">
+            <div className="page-container with-mobile-header-offset sysadmin-page">
                 <PageLoader message="Loading administrators..." />
             </div>
         );
     }
 
     return (
-        <div className="page-container with-mobile-header-offset">
+        <div className="page-container with-mobile-header-offset sysadmin-page" style={{ background: '#f8fafc' }}>
             {/* System Password Protection Modal */}
             {showPasswordPrompt && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 9999
-                }}>
-                    <div className="card" style={{ 
-                        width: '90%', 
-                        maxWidth: '400px',
-                        padding: '2rem'
-                    }}>
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-purple-100 flex items-center justify-center rounded-full mx-auto mb-4">
-                                <Shield size={32} className="text-purple-600" />
+                <div className="modal-overlay sysadmin-modal-overlay">
+                    <div className="modal-content sysadmin-password-modal">
+                        <div className="sysadmin-modal-hero">
+                            <div className="sysadmin-modal-icon">
+                                <Shield size={28} />
                             </div>
                             <h2 className="text-xl font-bold mb-2">Admin Controls Access</h2>
                             <p className="text-sm text-muted">Enter system password to continue</p>
                         </div>
+
+                        {passwordError && (
+                            <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <AlertCircle size={18} />
+                                <span>{passwordError}</span>
+                            </div>
+                        )}
 
                         <form onSubmit={handleSystemPasswordSubmit}>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-2">System Password</label>
                                 <input
                                     type="password"
-                                    className="input-field"
+                                    className="input"
                                     value={systemPassword}
                                     onChange={(e) => setSystemPassword(e.target.value)}
                                     placeholder="Enter system password"
@@ -279,28 +320,22 @@ const AdminManagement = () => {
                                 />
                             </div>
 
-                            {passwordError && (
-                                <div className="p-3 mb-4 bg-red-50 text-red-700 rounded text-sm flex items-center gap-2">
-                                    <AlertCircle size={16} />
-                                    {passwordError}
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                className="btn btn-primary w-full"
-                                disabled={isVerifying}
-                            >
-                                {isVerifying ? 'Verifying...' : 'Access Admin Controls'}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => navigate('/')}
-                                className="btn btn-secondary w-full mt-2"
-                            >
-                                Cancel
-                            </button>
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary w-full"
+                                    disabled={isVerifying}
+                                >
+                                    {isVerifying ? 'Verifying...' : 'Access Admin Controls'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/')}
+                                    className="btn btn-secondary w-full"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -342,6 +377,17 @@ const AdminManagement = () => {
                     <div className="card">
                         <div className="flex items-center justify-between">
                             <div>
+                                <p className="text-sm text-muted mb-2">Active Admins</p>
+                                <h2 className="text-2xl font-bold">{users.filter(u => u.role === 'admin' && u.subscription_status === 'active').length}</h2>
+                            </div>
+                            <div className="p-3" style={{ background: '#d1fae5' }}>
+                                <CheckCircle size={24} color="#16a34a" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="card">
+                        <div className="flex items-center justify-between">
+                            <div>
                                 <p className="text-sm text-muted mb-2">System Admins</p>
                                 <h2 className="text-2xl font-bold">{users.filter(u => u.role === 'sysadmin').length}</h2>
                             </div>
@@ -377,101 +423,126 @@ const AdminManagement = () => {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
                                     <th>Username</th>
-                                    <th>Business Name</th>
+                                    <th>Business</th>
                                     <th>Role</th>
                                     <th>Subscription</th>
+                                    <th>Features</th>
+                                    <th>Verification</th>
                                     <th>Status</th>
+                                    <th>Last Login</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {users.filter(u => {
-                                    if (!searchQuery) return true; // Show all if no search query
-                                    const query = searchQuery.toLowerCase();
-                                    return (
-                                        (u.username && u.username.toLowerCase().includes(query)) ||
-                                        (u.business_name && u.business_name.toLowerCase().includes(query)) ||
-                                        (u.email && u.email.toLowerCase().includes(query)) ||
-                                        (u.phone && u.phone.toLowerCase().includes(query)) ||
-                                        (u.id && u.id.toString().includes(query)) ||
-                                        (u.role && u.role.toLowerCase().includes(query))
-                                    );
-                                }).map(u => (
-                                    <tr key={u.id}>
-                                        <td>{u.id}</td>
-                                        <td className="font-medium">
-                                            {u.username}
-                                            <div className="text-xs text-muted">{u.phone || ''}</div>
-                                        </td>
-                                        <td>{u.business_name || '-'}</td>
-                                        <td>
-                                            <span className={`badge ${u.role === 'admin' ? 'bg-blue-500' : 'bg-purple-500'}`}>
-                                                {u.role === 'admin' ? 'Admin' : 'System Admin'}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span className={`badge ${u.subscription_status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}>
-                                                {u.subscription_status || 'active'}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {(() => {
-                                                const accessStatus = getAccessStatus(u);
-                                                return (
-                                                    <span className={`badge ${accessStatus.color}`} title={
-                                                        u.active_window_start || u.active_window_end 
-                                                            ? `Access: ${u.active_window_start || 'No start'} to ${u.active_window_end || 'No end'}`
-                                                            : 'Unlimited access'
-                                                    }>
-                                                        {accessStatus.label}
+                                {(() => {
+                                    const filtered = users.filter(u => {
+                                        if (!searchQuery) return true;
+                                        const q = searchQuery.toLowerCase();
+                                        return (
+                                            (u.username && u.username.toLowerCase().includes(q)) ||
+                                            (u.business_name && u.business_name.toLowerCase().includes(q)) ||
+                                            (u.email && u.email.toLowerCase().includes(q)) ||
+                                            (u.phone && u.phone.toLowerCase().includes(q)) ||
+                                            (u.role && u.role.toLowerCase().includes(q))
+                                        );
+                                    });
+                                    if (filtered.length === 0) {
+                                        return (
+                                            <tr>
+                                                <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                                        <Search size={32} style={{ opacity: 0.3 }} />
+                                                        <p>{searchQuery ? `No users found matching "${searchQuery}"` : 'No users found'}</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
+                                    return filtered.map(u => (
+                                        <tr key={u.id}>
+                                            <td className="font-medium">
+                                                {u.username}
+                                                <div className="text-xs text-muted">{u.phone || ''}</div>
+                                            </td>
+                                            <td>
+                                                <div>{u.business_name || <span className="text-xs text-muted">—</span>}</div>
+                                                {u.business_type && (
+                                                    <span className={`badge text-xs ${u.business_type === 'retailer' ? 'bg-orange-400' : 'bg-sky-500'}`} style={{ marginTop: '3px' }}>
+                                                        {u.business_type}
                                                     </span>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    className="btn-icon"
-                                                    onClick={() => openEditModal(u)}
-                                                    title="Edit User"
-                                                >
-                                                    <Edit size={16} />
-                                                </button>
-                                                {u.id !== user?.id && (
-                                                    <button
-                                                        className="btn-icon danger"
-                                                        onClick={() => handleDeleteUser(u.id)}
-                                                        title="Delete User"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
                                                 )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {searchQuery && users.filter(u => {
-                                    const query = searchQuery.toLowerCase();
-                                    return (
-                                        (u.username && u.username.toLowerCase().includes(query)) ||
-                                        (u.business_name && u.business_name.toLowerCase().includes(query)) ||
-                                        (u.email && u.email.toLowerCase().includes(query)) ||
-                                        (u.phone && u.phone.toLowerCase().includes(query)) ||
-                                        (u.id && u.id.toString().includes(query)) ||
-                                        (u.role && u.role.toLowerCase().includes(query))
-                                    );
-                                }).length === 0 && (
-                                        <tr>
-                                            <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                                    <Search size={32} style={{ opacity: 0.3 }} />
-                                                    <p>No users found matching "{searchQuery}"</p>
+                                            </td>
+                                            <td>
+                                                <span className={`badge ${u.role === 'admin' ? 'bg-blue-500' : u.role === 'sysadmin' ? 'bg-purple-500' : 'bg-emerald-500'}`}>
+                                                    {u.role === 'admin' ? 'Admin' : u.role === 'sysadmin' ? 'Sys Admin' : u.role === 'kitchen' ? 'Kitchen' : u.role}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span className={`badge ${u.subscription_status === 'active' ? 'bg-green-500' : u.subscription_status === 'trial' ? 'bg-yellow-500' : 'bg-red-500'}`}>
+                                                    {u.subscription_status || 'active'}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {u.features ? (
+                                                    <span className="badge bg-slate-500 text-white">
+                                                        {Object.values(u.features).filter(Boolean).length}/{Object.keys(u.features).length}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-muted">—</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                {u.role === 'admin' ? (
+                                                    <span className={`badge ${u.is_verified ? 'bg-green-500' : 'bg-yellow-500'}`}>
+                                                        {u.is_verified ? 'Verified' : 'Pending'}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-muted">—</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                {(() => {
+                                                    const accessStatus = getAccessStatus(u);
+                                                    return (
+                                                        <span className={`badge ${accessStatus.color}`} title={
+                                                            u.active_window_start || u.active_window_end
+                                                                ? `Access: ${u.active_window_start || 'No start'} to ${u.active_window_end || 'No end'}`
+                                                                : 'Unlimited access'
+                                                        }>
+                                                            {accessStatus.label}
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </td>
+                                            <td className="text-xs text-muted">
+                                                {u.last_login
+                                                    ? new Date(u.last_login).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })
+                                                    : <span style={{ color: '#d1d5db' }}>Never</span>}
+                                            </td>
+                                            <td>
+                                                <div className="flex gap-2">
+                                                    {u.role === 'admin' && !u.is_verified && (
+                                                        <button className="btn-icon success" onClick={() => handleVerifyUser(u.id)} title="Verify admin">
+                                                            <CheckCircle size={16} />
+                                                        </button>
+                                                    )}
+                                                    <button className="btn-icon" onClick={() => openEditModal(u)} title="Edit User">
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button className="btn-icon" onClick={() => openFeatureModal(u)} title="Manage Features">
+                                                        <Settings size={16} />
+                                                    </button>
+                                                    {u.id !== user?.id && (
+                                                        <button className="btn-icon danger" onClick={() => handleDeleteUser(u.id)} title="Delete User">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
-                                    )}
+                                    ));
+                                })()}
                             </tbody>
                         </table>
                     </div>
@@ -480,16 +551,29 @@ const AdminManagement = () => {
 
             {/* Add User Modal */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="card max-w-lg w-full">
-                        <h2 className="mb-4">Add New User</h2>
+                <div className="modal-overlay sysadmin-modal-overlay">
+                    <div className="modal-content sysadmin-user-modal">
+                        <div className="modal-header">
+                            <div className="flex items-center gap-3">
+                                <div className="sysadmin-modal-icon small">
+                                    <UserPlus size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold">Add New User</h2>
+                                    <p className="text-sm text-muted">Create admin access and business details</p>
+                                </div>
+                            </div>
+                            <button type="button" className="btn-icon" onClick={() => { setShowAddModal(false); setError(''); }}>
+                                <X size={18} />
+                            </button>
+                        </div>
                         {error && (
-                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded flex items-center gap-2">
+                            <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded flex items-center gap-2">
                                 <AlertCircle size={18} color="#dc2626" />
                                 <span className="text-sm text-red-600">{error}</span>
                             </div>
                         )}
-                        <form onSubmit={handleAddUser}>
+                        <form onSubmit={handleAddUser} className="modal-body">
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-2">Username</label>
                                 <input
@@ -580,6 +664,17 @@ const AdminManagement = () => {
                                 />
                             </div>
                             <div className="mb-4">
+                                <label className="block text-sm font-medium mb-2">WhatsApp Business Number</label>
+                                <input
+                                    className="input"
+                                    type="text"
+                                    placeholder="+919876543210"
+                                    value={formData.whatsapp_from_display}
+                                    onChange={(e) => setFormData({ ...formData, whatsapp_from_display: e.target.value })}
+                                />
+                                <p className="text-xs text-muted mt-1">The number this admin will send invoices FROM (requires WhatsApp Business API credentials configured in Settings)</p>
+                            </div>
+                            <div className="mb-4">
                                 <label className="block text-sm font-medium mb-2">Password</label>
                                 <div className="relative">
                                     <input
@@ -606,8 +701,14 @@ const AdminManagement = () => {
                                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                 >
                                     <option value="admin">Administrator</option>
+                                    <option value="kitchen">Kitchen Staff</option>
                                     <option value="sysadmin">System Administrator</option>
                                 </select>
+                                {formData.role === 'kitchen' && (
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Kitchen staff can log in immediately with KOT and order status access.
+                                    </p>
+                                )}
                             </div>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-2">Subscription Status</label>
@@ -645,6 +746,9 @@ const AdminManagement = () => {
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">Leave empty for unlimited access</p>
                             </div>
+                            <p className="verification-note">
+                                New admin accounts stay pending until you verify them from the user table.
+                            </p>
                             <div className="flex gap-2">
                                 <button type="submit" className="btn flex-1">Create User</button>
                                 <button type="button" className="btn-secondary flex-1" onClick={() => { setShowAddModal(false); setError(''); }}>Cancel</button>
@@ -656,27 +760,24 @@ const AdminManagement = () => {
 
             {/* Edit User Modal */}
             {showEditModal && selectedUser && (
-                <div className="fixed inset-0 bg-black-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full flex flex-col" style={{ maxHeight: '90vh' }}>
-                        {/* Header */}
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0 bg-white rounded-t-xl">
+                <div className="modal-overlay sysadmin-modal-overlay">
+                    <div className="modal-content sysadmin-edit-modal">
+                        <div className="modal-header">
                             <div className="flex items-center gap-3">
-                                <div className="bg-indigo-50 p-2 rounded-lg">
-                                    <Shield size={24} className="text-indigo-600" />
+                                <div className="sysadmin-modal-icon small">
+                                    <Edit size={20} />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-gray-900">Edit User Account</h2>
+                                    <h2 className="text-xl font-bold">Edit User Account</h2>
                                     <p className="text-sm text-gray-500">Update system access and business profile</p>
                                 </div>
                             </div>
                             <button
                                 type="button"
-                                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg p-2 transition-all"
+                                className="btn-icon"
                                 onClick={() => { setShowEditModal(false); setError(''); }}
                             >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <X size={18} />
                             </button>
                         </div>
 
@@ -687,7 +788,8 @@ const AdminManagement = () => {
                             </div>
                         )}
 
-                        <form onSubmit={handleUpdateUser} className="flex-1 overflow-y-auto p-6 bg-gray-50-50">
+                        <form onSubmit={handleUpdateUser} className="sysadmin-edit-form">
+                            <div className="modal-body sysadmin-edit-body">
 
                             {/* Account Credentials */}
                             <div className="form-section">
@@ -731,7 +833,7 @@ const AdminManagement = () => {
                                                 />
                                                 <button
                                                     type="button"
-                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                    className="btn-icon password-toggle-btn"
                                                     onClick={() => setShowPassword(!showPassword)}
                                                 >
                                                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -888,33 +990,49 @@ const AdminManagement = () => {
                                                 placeholder="+1 (555) 000-0000"
                                             />
                                         </div>
+                                        <div>
+                                            <label className="label-text">WhatsApp Business Number</label>
+                                            <input
+                                                className="input"
+                                                type="text"
+                                                value={formData.whatsapp_from_display}
+                                                onChange={(e) => setFormData({ ...formData, whatsapp_from_display: e.target.value })}
+                                                placeholder="+919876543210"
+                                            />
+                                            <p className="input-helper">Display number for WhatsApp Business API</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                        </form>
+                            </div>
 
-                        {/* Footer Actions */}
-                        <div className="p-4 border-t border-gray-200 bg-white rounded-b-xl flex gap-3 justify-end flex-shrink-0">
-                            <button
-                                type="button"
-                                className="btn-secondary"
-                                onClick={() => { setShowEditModal(false); setError(''); }}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                onClick={handleUpdateUser} /* Trigger form submit via button click if needed, or rely on form submit */
-                                className="btn"
-                            >
-                                <Edit size={16} />
-                                Save Changes
-                            </button>
-                        </div>
+                            <div className="modal-footer justify-end">
+                                <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    onClick={() => { setShowEditModal(false); setError(''); }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn">
+                                    <Edit size={16} />
+                                    Save Changes
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
+
+            <FeatureManagementModal
+                isOpen={showFeatureModal}
+                userId={featureUser?.id}
+                userName={featureUser?.username}
+                userBusinessType={featureUser?.business_type}
+                onClose={closeFeatureModal}
+                onSave={fetchUsers}
+            />
         </div>
     );
 };

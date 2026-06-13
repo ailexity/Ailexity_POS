@@ -17,9 +17,11 @@ async def create_table(
     db = Depends(get_db)
 ):
     """Create a new table"""
+    tenant_admin_id = current_user.get("admin_id") or current_user["id"]
+
     # Check if table number already exists for this admin
     existing = db.tables.find_one({
-        "admin_id": current_user["id"],
+        "admin_id": tenant_admin_id,
         "table_number": table.table_number
     })
     
@@ -31,7 +33,7 @@ async def create_table(
     
     # Create table document
     table_doc = TableDocument.create(
-        admin_id=current_user["id"],
+        admin_id=tenant_admin_id,
         table_number=table.table_number,
         table_name=table.table_name,
         capacity=table.capacity,
@@ -49,7 +51,8 @@ async def get_tables(
     db = Depends(get_db)
 ):
     """Get all tables for current admin"""
-    tables = list(db.tables.find({"admin_id": current_user["id"]}).sort("table_number", 1))
+    tenant_admin_id = current_user.get("admin_id") or current_user["id"]
+    tables = list(db.tables.find({"admin_id": tenant_admin_id}).sort("table_number", 1))
     return serialize_docs(tables)
 
 @router.get("/{table_id}", response_model=TableResponse)
@@ -62,9 +65,10 @@ async def get_table(
     if not ObjectId.is_valid(table_id):
         raise HTTPException(status_code=400, detail="Invalid table ID")
     
+    tenant_admin_id = current_user.get("admin_id") or current_user["id"]
     table = db.tables.find_one({
         "_id": ObjectId(table_id),
-        "admin_id": current_user["id"]
+        "admin_id": tenant_admin_id
     })
     
     if not table:
@@ -84,9 +88,10 @@ async def update_table(
         raise HTTPException(status_code=400, detail="Invalid table ID")
     
     # Get existing table
+    tenant_admin_id = current_user.get("admin_id") or current_user["id"]
     existing_table = db.tables.find_one({
         "_id": ObjectId(table_id),
-        "admin_id": current_user["id"]
+        "admin_id": tenant_admin_id
     })
     
     if not existing_table:
@@ -95,7 +100,7 @@ async def update_table(
     # Check if table number is being changed and already exists
     if table_update.table_number and table_update.table_number != existing_table["table_number"]:
         duplicate = db.tables.find_one({
-            "admin_id": current_user["id"],
+            "admin_id": tenant_admin_id,
             "table_number": table_update.table_number,
             "_id": {"$ne": ObjectId(table_id)}
         })
@@ -127,9 +132,10 @@ async def delete_table(
     if not ObjectId.is_valid(table_id):
         raise HTTPException(status_code=400, detail="Invalid table ID")
     
+    tenant_admin_id = current_user.get("admin_id") or current_user["id"]
     result = db.tables.delete_one({
         "_id": ObjectId(table_id),
-        "admin_id": current_user["id"]
+        "admin_id": tenant_admin_id
     })
     
     if result.deleted_count == 0:

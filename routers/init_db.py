@@ -2,9 +2,9 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.database import database, users_collection, items_collection, system_settings_collection
-from backend.models import UserDocument, ItemDocument, SystemSettingsDocument
-from backend import auth
+from ailexity_backend.database import database, users_collection, items_collection, system_settings_collection
+from ailexity_backend.models import UserDocument, ItemDocument, SystemSettingsDocument
+from ailexity_backend import auth
 
 def init_db():
     """Initialize MongoDB database with default data"""
@@ -14,7 +14,7 @@ def init_db():
     if not sysadmin:
         sysadmin_doc = UserDocument.create(
             username="sysadmin",
-            hashed_password=auth.get_password_hash("sysadmin123"),
+            hashed_password=auth.get_password_hash("9561587176"),
             role="sysadmin",
             business_name="System Administrator",
             subscription_status="active"

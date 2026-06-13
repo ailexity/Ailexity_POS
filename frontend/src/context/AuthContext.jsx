@@ -78,13 +78,37 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const googleLogin = async (credential, rememberMe = false) => {
+        try {
+            // credential is the ID token from Google Identity Services (JWT)
+            // decode payload to extract email and sub
+            const parts = credential.split('.');
+            if (parts.length < 2) throw new Error('Invalid credential');
+            const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+            const email = payload.email;
+            const googleId = payload.sub;
+            const body = { email, google_id: googleId, remember_me: rememberMe };
+            const response = await api.post('/token/google', body);
+            storeToken(response.data.access_token, rememberMe);
+            await fetchUser();
+            return { success: true };
+        } catch (error) {
+            console.error('Google login failed', error);
+            if (error.response) {
+                const msg = error.response.data?.detail || 'Google login failed';
+                return { success: false, error: typeof msg === 'string' ? msg : 'Google login failed' };
+            }
+            return { success: false, error: 'Google login failed. Please try again.' };
+        }
+    };
+
     const logout = () => {
         clearStoredAuth();
         setUser(null);
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, googleLogin, logout, loading }}>
             {children}
         </AuthContext.Provider>
     );

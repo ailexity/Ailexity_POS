@@ -52,11 +52,39 @@ class UserDocument:
         active_window_end: Optional[str] = None,
         is_active: bool = True,
         enable_multi_device_sync: bool = False,
-        enable_order_management: bool = False
+        enable_order_management: bool = False,
+        features: Optional[Dict[str, bool]] = None
     ) -> Dict[str, Any]:
+        # Default features for new admin users
+        default_features = {
+            "stock_management": True,
+            "ledger_management": True,
+            "parties_management": True,
+            "items_management": True,
+            "pos_billing": True,
+            "invoices": True,
+            "alerts": True,
+            "dashboard": True,
+            "admin_panel": True,
+            "kot_printing": True,
+            "order_management": True,
+            "payment_tracking": True,
+            "attendees_management": True,
+        }
+        
+        if features is None:
+            features = default_features
+        else:
+            # Merge with defaults to ensure all keys exist
+            features = {**default_features, **features}
+        
         return {
             "username": username,
             "hashed_password": hashed_password,
+            "is_verified": False,
+            "google_id": None,
+            "otp": None,
+            "otp_expires": None,
             "role": role,
             "is_active": is_active,
             "business_name": business_name,
@@ -79,6 +107,7 @@ class UserDocument:
             "active_window_end": active_window_end,
             "enable_multi_device_sync": enable_multi_device_sync,
             "enable_order_management": enable_order_management,
+            "features": features,
             "created_at": datetime.now(IST),
             "last_login": None
         }

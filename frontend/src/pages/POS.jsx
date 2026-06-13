@@ -2,7 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { Search, Plus, Minus, Trash2, ShoppingCart, Grid, Package, Smartphone, FileText, Grid3x3 } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, Grid, Package, Smartphone, FileText, Grid3x3, Printer } from 'lucide-react';
+import KOTPrintDialog from '../components/KOTPrintDialog';
+import { POSItemsSkeleton } from '../components/Skeleton';
+import { usePOSItems } from '../hooks/usePOSItems';
+import { useKOTStatus } from '../hooks/useKOTStatus';
 import './POS.css';
 
 const normalizeBusinessType = (businessType) => {
@@ -13,12 +17,20 @@ const normalizeBusinessType = (businessType) => {
 
 const POS = () => {
     const DESKTOP_BREAKPOINT = 1024;
-    const [items, setItems] = useState([]);
-    const [search, setSearch] = useState("");
-    const { selectedTable, selectTable, cartItems, addToCart, removeFromCart, updateQty, cartTotal, cartTax, grandTotal, clearCart, setUserTaxRate, tableCarts, multiDeviceSyncEnabled, setMultiDeviceSync, fetchTableCartFromBackend } = useCart();
+    const { selectedTable, selectTable, cartItems, addToCart, removeFromCart, updateQty, cartTotal, cartTax, grandTotal, clearCart, setUserTaxRate, tableCarts, multiDeviceSyncEnabled, setMultiDeviceSync, fetchTableCartFromBackend, discountType, discountValue, discountAmount, setDiscountType, setDiscountValue, clearDiscount, updateItemNotes } = useCart();
     const { user } = useAuth();
-    const [loading, setLoading] = useState(false);
-    const [activeCategory, setActiveCategory] = useState("All");
+    const businessType = normalizeBusinessType(user?.business_type);
+    const isRetailerEarly = businessType === 'retailer';
+
+    // Custom hooks — replace inline state + effects for items and KOT polling
+    const { items, loading: itemsLoading, filteredItems, search, setSearch, activeCategory, setActiveCategory, categories } = usePOSItems();
+    const { kotStatuses, refresh: refreshKotStatuses } = useKOTStatus(isRetailerEarly);
+
+    const [checkoutLoading, setCheckoutLoading] = useState(false);
+    const [paymentMode, setPaymentMode] = useState('Cash');
+    const [transactionId, setTransactionId] = useState('');
+    const [expandedNoteId, setExpandedNoteId] = useState(null);
+
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [customerGstin, setCustomerGstin] = useState("");
@@ -28,16 +40,28 @@ const POS = () => {
     const [tables, setTables] = useState([]);
     const [showTableSelector, setShowTableSelector] = useState(false);
     const [showCart, setShowCart] = useState(false);
+    const [showKOTPrint, setShowKOTPrint] = useState(false);
+    const [showKOTOptions, setShowKOTOptions] = useState(false);
+    const [autoPrintKOT, setAutoPrintKOT] = useState(false);
     const [isDesktopView, setIsDesktopView] = useState(() => window.innerWidth >= DESKTOP_BREAKPOINT);
     const [cartMaxHeight, setCartMaxHeight] = useState(null);
     const cartPanelRef = useRef(null);
     const isCartOpen = isDesktopView || showCart;
-    const businessType = normalizeBusinessType(user?.business_type);
-    const isRetailer = businessType === 'retailer';
+
+    const isRetailer = isRetailerEarly;
+    const isAttendee = user?.role === 'attendee';
     const retailBillingTable = useMemo(() => ({
         id: 'retail-billing',
         table_number: null,
         table_name: 'Retail Billing',
+        capacity: 1,
+        is_virtual: true,
+    }), []);
+
+    const attendeeBillingTable = useMemo(() => ({
+        id: 'attendee-billing',
+        table_number: null,
+        table_name: 'Attendee Billing',
         capacity: 1,
         is_virtual: true,
     }), []);
@@ -84,19 +108,6 @@ const POS = () => {
             setUserTaxRate(user.tax_rate || 0);
         }
     }, [user, setUserTaxRate]);
-
-    useEffect(() => {
-        const fetchItems = async () => {
-            try {
-                const res = await api.get('/items/');
-                setItems(Array.isArray(res.data) ? res.data : []);
-            } catch (e) {
-                console.error(e);
-                setItems([]);
-            }
-        };
-        fetchItems();
-    }, []);
 
     useEffect(() => {
         const fetchTables = async () => {
@@ -157,10 +168,18 @@ const POS = () => {
             return;
         }
 
+        if (isAttendee) {
+            if (!selectedTable) {
+                selectTable(attendeeBillingTable);
+            }
+            setShowTableSelector(false);
+            return;
+        }
+
         if (selectedTable?.is_virtual) {
             selectTable(null);
         }
-    }, [isRetailer, selectedTable, selectTable, retailBillingTable]);
+    }, [isRetailer, isAttendee, selectedTable, selectTable, retailBillingTable, attendeeBillingTable]);
 
     useEffect(() => {
         if (!cartPanelRef.current) return;
@@ -192,30 +211,18 @@ const POS = () => {
         };
     }, [cartItems.length, isCartOpen, lastInvoice, customerName, customerPhone]);
 
-    // Get unique categories (case-insensitive grouping, but keep original case for display)
-    const categoryMap = new Map();
-    items.forEach(item => {
-        if (item.category) {
-            const lowerKey = item.category.toLowerCase();
-            if (!categoryMap.has(lowerKey)) {
-                categoryMap.set(lowerKey, item.category);
-            }
-        }
-    });
-    const categories = ["All", ...categoryMap.values()];
-
-    const filteredItems = items.filter(i =>
-        (activeCategory === "All" || i.category?.toLowerCase() === activeCategory.toLowerCase()) &&
-        i.name.toLowerCase().includes(search.toLowerCase())
-    );
-
     const handleCheckout = async () => {
         if (!cartItems?.length) {
             alert("Please add items to cart before completing order");
             return;
         }
 
-        setLoading(true);
+        if (isAttendee) {
+            alert("Attendee logins can access billing but cannot complete or send orders. Please ask an admin to finalize the invoice.");
+            return;
+        }
+
+        setCheckoutLoading(true);
         try {
             const taxRate = user?.tax_rate ?? 0;
             const selectedParty = parties.find((p) => p.id === selectedPartyId);
@@ -236,7 +243,10 @@ const POS = () => {
                 customer_name: checkoutCustomerName,
                 customer_phone: checkoutCustomerPhone,
                 customer_gstin: customerGstin.trim() || null,
-                payment_mode: "Cash",
+                payment_mode: paymentMode,
+                transaction_id: transactionId.trim() || null,
+                discount_amount: discountAmount > 0 ? discountAmount : 0,
+                discount_type: discountAmount > 0 ? discountType : null,
                 table_number: isRetailer ? null : (selectedTable?.table_number || null),
                 table_name: isRetailer ? null : (selectedTable?.table_name || null),
                 created_at: localDateTime, // Send local datetime without timezone conversion
@@ -250,22 +260,32 @@ const POS = () => {
             };
 
             const res = await api.post("/invoices/", payload);
-            setLastInvoice(res.data);
+            const invoice = res.data;
+            setLastInvoice(invoice);
             clearCart();
             setCustomerName("");
             setCustomerPhone("");
             setCustomerGstin("");
             setSelectedPartyId('');
+            setPaymentMode('Cash');
+            setTransactionId('');
+            clearDiscount();
+
+            if (invoice._offline) {
+                // Invoice was queued — no real number yet, no WhatsApp prompt
+                // The OfflineBanner in App.jsx will show the pending count
+                return;
+            }
 
             if (checkoutCustomerPhone) {
                 const sendWhatsApp = window.confirm(
-                    `Invoice Created: ${res.data.invoice_number}${(!isRetailer && selectedTable) ? `\nTable: ${selectedTable.table_name}` : ''}\n\nWould you like to send this invoice via WhatsApp?`
+                    `Invoice Created: ${invoice.invoice_number}${(!isRetailer && selectedTable) ? `\nTable: ${selectedTable.table_name}` : ''}\n\nWould you like to send this invoice via WhatsApp?`
                 );
                 if (sendWhatsApp) {
-                    shareWhatsApp(res.data);
+                    shareWhatsApp(invoice);
                 }
             } else {
-                alert(`Invoice Created: ${res.data.invoice_number}${(!isRetailer && selectedTable) ? `\nTable: ${selectedTable.table_name}` : ''}`);
+                alert(`Invoice Created: ${invoice.invoice_number}${(!isRetailer && selectedTable) ? `\nTable: ${selectedTable.table_name}` : ''}`);
             }
         } catch (e) {
             console.error("Checkout error:", e);
@@ -287,75 +307,100 @@ const POS = () => {
             }
             alert(`Checkout Failed: ${errorMessage}`);
         } finally {
-            setLoading(false);
+            setCheckoutLoading(false);
         }
     };
 
+        const sendToKOTDisplay = async () => {
+            if (!cartItems?.length) return;
+            try {
+                const payload = {
+                    table_number: isRetailer ? null : (selectedTable?.table_number || null),
+                    table_name: isRetailer ? null : (selectedTable?.table_name || null),
+                    items: cartItems.map((i) => ({
+                        item_id: i.id != null ? String(i.id) : null,
+                        item_name: String(i.name || ""),
+                        quantity: Math.max(1, Math.floor(Number(i.qty) || 1)),
+                        unit_price: Number(i.price) || 0,
+                        notes: i.notes || '',
+                    })),
+                    notes: cartItems.filter(i => i.notes).map(i => `${i.name}: ${i.notes}`).join(' | ')
+                };
+
+                await api.post('/kots/', payload);
+                alert('Order sent to KOT display');
+                setShowKOTOptions(false);
+                refreshKotStatuses();
+            } catch (e) {
+                console.error('KOT send error', e);
+                let msg = 'Failed to send order to KOT display';
+                if (e.response?.data?.detail) msg = e.response.data.detail;
+                alert(msg);
+            }
+        };
+
+        const printViaBluetooth = () => {
+            // Admin flow: open KOT print dialog and trigger auto-print
+            setShowKOTOptions(false);
+            setAutoPrintKOT(true);
+            setShowKOTPrint(true);
+        };
+
     const shareWhatsApp = async (invoice) => {
-        // Get customer name for personalization
+        const phone = invoice.customer_phone || customerPhone;
+        if (!phone) return;
+
+        const invoiceUrl = `${window.location.origin}/invoice/${invoice.id}`;
+
+        // ── Path A: Backend WhatsApp Business API (one-click, no redirect) ──
+        if (user?.whatsapp_enabled) {
+            try {
+                await api.post('/whatsapp/send', {
+                    to_phone: phone,
+                    invoice_id: invoice.id,
+                    invoice_number: invoice.invoice_number,
+                    customer_name: invoice.customer_name || customerName || null,
+                    total_amount: invoice.total_amount,
+                    invoice_url: invoiceUrl,
+                });
+                // Silent success — the banner/toast can show confirmation
+                return;
+            } catch (err) {
+                // If backend API fails, fall through to wa.me link
+                console.warn('WhatsApp API send failed, falling back to wa.me:', err.response?.data?.detail || err.message);
+            }
+        }
+
+        // ── Path B: wa.me redirect (fallback or API not configured) ──
         const custName = invoice.customer_name || customerName || 'Valued Customer';
         const businessName = invoice.business_name || user?.business_name || 'Our Store';
 
-        // Generate invoice URLs
-        const invoiceUrl = `${window.location.origin}/invoice/${invoice.id}`;
-        const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-        const resolvedApiBase = apiBase.startsWith('http') ? apiBase : `${window.location.origin}${apiBase}`;
-        const sharePreviewUrl = `${resolvedApiBase}/invoices/public/${invoice.id}/share`;
-
-        // Load WhatsApp template from localStorage
         let template = {
             greeting: 'Dear {customer_name},',
             thank_you: 'Thank you for your recent order at {business_name}!\nYour invoice is now available. 🪄',
             closing: 'Loved your experience? Or something to improve? Tap to tell us! 🌟',
             show_invoice_link: true,
             show_date: true,
-            show_total: true
+            show_total: true,
         };
-        
         try {
-            const savedTemplate = localStorage.getItem('whatsapp_template');
-            if (savedTemplate) {
-                template = { ...template, ...JSON.parse(savedTemplate) };
-            }
-        } catch (e) {
-            console.error('Error loading WhatsApp template:', e);
-        }
+            const saved = localStorage.getItem('whatsapp_template');
+            if (saved) template = { ...template, ...JSON.parse(saved) };
+        } catch { /* ignore */ }
 
-        // Build the message using template
         let message = template.greeting.replace('{customer_name}', custName);
         message += '\n\n' + template.thank_you.replace('{business_name}', businessName);
-        message += '\n';
-        
-        if (template.show_total) {
-            message += `\n💰 Amount : Rs.${invoice.total_amount.toFixed(0)}`;
-        }
-        
+        if (template.show_total) message += `\n💰 Amount : ₹${invoice.total_amount.toFixed(0)}`;
         if (template.show_date) {
-            const date = new Date(invoice.created_at);
-            const dateStr = date.toLocaleDateString('en-IN', { 
-                day: '2-digit',
-                month: '2-digit', 
-                year: 'numeric',
-                timeZone: 'Asia/Kolkata' 
-            }).replace(/\//g, '/');
-            const timeStr = date.toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-                timeZone: 'Asia/Kolkata'
-            });
+            const d = new Date(invoice.created_at);
+            const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Kolkata' });
+            const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
             message += `\n📅 Date : ${dateStr} ${timeStr}`;
         }
-        
-        if (template.show_invoice_link) {
-            message += `\n👁 View Invoice : ${sharePreviewUrl}`;
-        }
-        
+        if (template.show_invoice_link) message += `\n👁 View Invoice : ${invoiceUrl}`;
         message += '\n\n' + template.closing;
 
-        const phone = invoice.customer_phone || customerPhone;
-        const url = `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
+        window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
     };
 
 
@@ -386,7 +431,7 @@ const POS = () => {
                             <div className="pos-header-actions">
                                 <button
                                     onClick={() => setShowTableSelector(!showTableSelector)}
-                                    className={`btn table-selector-btn${showTableSelector ? ' is-active' : ''}`}
+                                    className="btn table-selector-btn"
                                 >
                                     <Grid3x3 size={18} />
                                     <span className="font-medium">
@@ -404,9 +449,9 @@ const POS = () => {
                         <div className="table-dropdown-header">
                             <h3>Select a Table</h3>
                         </div>
-                        <div className="table-dropdown-body custom-scrollbar">
+                        <div className="table-dropdown-body">
                             {tables.length === 0 ? (
-                                <div className="table-dropdown-empty">
+                                <div className="empty-table-state">
                                     <p>No tables configured</p>
                                     <p>Go to Settings to add tables</p>
                                 </div>
@@ -414,7 +459,9 @@ const POS = () => {
                                 <div className="table-grid">
                                     {tables.map(table => {
                                         const hasOrders = tableCarts[table.id] && tableCarts[table.id].length > 0;
-                                        const isSelected = selectedTable?.id === table.id;
+                                        const tableStatus = kotStatuses[String(table.table_number)];
+                                        const hasActiveKot = tableStatus && ['pending', 'preparing', 'ready', 'printed'].includes(tableStatus.status);
+                                        const statusText = tableStatus?.label || (hasOrders ? 'Occupied' : 'Available');
                                         return (
                                             <button
                                                 key={table.id}
@@ -422,17 +469,22 @@ const POS = () => {
                                                     selectTable(table);
                                                     setShowTableSelector(false);
                                                 }}
-                                                className={`table-btn${isSelected ? ' selected' : ''}`}
+                                                className={`table-btn ${selectedTable?.id === table.id ? 'selected' : ''} ${hasOrders ? 'has-orders' : ''} ${hasActiveKot ? 'has-kot' : ''}`}
                                             >
-                                                {hasOrders && (
-                                                    <span className="table-btn-indicator" title="Has ongoing orders"></span>
+                                                {hasActiveKot && (
+                                                    <span
+                                                        className="table-badge"
+                                                        title={`KOT ${statusText}`}
+                                                        style={{
+                                                            backgroundColor: tableStatus.color,
+                                                            boxShadow: `0 0 0 3px ${tableStatus.color}22`,
+                                                        }}
+                                                    />
                                                 )}
-                                                <span className="table-btn-name">{table.table_name}</span>
-                                                <span className="table-btn-number">#{table.table_number}</span>
-                                                <span className="table-btn-capacity">{table.capacity} seats</span>
-                                                {hasOrders && (
-                                                    <span className="table-btn-status">Occupied</span>
-                                                )}
+                                                <div className="table-name">{table.table_name}</div>
+                                                <div className="table-details">#{table.table_number}</div>
+                                                <div className="table-details">{table.capacity} seats</div>
+                                                <div className={`table-status ${tableStatus ? `kot-${tableStatus.status}` : ''}`}>{statusText}</div>
                                             </button>
                                         );
                                     })}
@@ -471,42 +523,56 @@ const POS = () => {
 
                 {/* Item Grid */}
                 <div className="pos-grid-area custom-scrollbar">
-                    <div className="pos-grid">
-                        {filteredItems.length === 0 ? (
-                            <div className="pos-grid-empty">
-                                <Package size={40} style={{ opacity: 0.4 }} />
-                                <p>No items match your search</p>
-                            </div>
-                        ) : (
-                            filteredItems.map(item => (
-                                <div
-                                    key={item.id}
-                                    className="pos-item-card"
-                                    onClick={() => addToCart(item)}
-                                >
-                                    <div className="pos-item-top">
-                                        <div className="pos-item-avatar">
-                                            {item.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <span className="price-badge">
-                                            ₹{item.price}
-                                        </span>
+                    {itemsLoading ? (
+                        <POSItemsSkeleton count={12} />
+                    ) : null}
+                    <div className="pos-grid" style={itemsLoading ? { display: 'none' } : undefined}>
+                        {filteredItems.map(item => (
+                            <div
+                                key={item.id}
+                                className="pos-item-card"
+                                onClick={() => addToCart(item)}
+                            >
+                                <div className="flex justify-between items-start mb-2">
+                                    <div style={{ width: '28px', height: '28px', background: '#eff6ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.875rem' }}>
+                                        {item.name.charAt(0)}
                                     </div>
+                                    <span className="price-badge" style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
+                                        ₹{item.price}
+                                    </span>
+                                </div>
 
-                                    <h3>{item.name}</h3>
-                                    <p>{item.category}</p>
+                                <h3 style={{ marginBottom: '0.125rem', fontSize: '0.875rem' }}>{item.name}</h3>
+                                <p className="text-xs text-muted" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.625rem' }}>{item.category}</p>
 
-                                    <div className="pos-item-footer">
-                                        <div className="pos-item-add">
-                                            <Plus size={14} />
-                                        </div>
+                                <div className="flex items-center justify-end mt-2 pt-2 border-t border-gray-100" style={{ borderTop: '1px solid #f1f5f9' }}>
+                                    <div style={{ padding: '0.25rem', background: '#f8fafc', color: '#64748b', display: 'flex' }}>
+                                        <Plus size={12} />
                                     </div>
                                 </div>
-                            ))
-                        )}
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
+
+            {/* Mobile-only cart peek bar — always visible at bottom, tapping opens full cart */}
+            {!isDesktopView && !showCart && (
+                <button
+                    className="mobile-cart-peek"
+                    onClick={() => setShowCart(true)}
+                    aria-label="Open cart"
+                >
+                    <div className="mobile-cart-peek-left">
+                        <span className="mobile-cart-badge">{cartItems.reduce((s, i) => s + i.qty, 0)}</span>
+                        <span className="mobile-cart-peek-label">View Cart</span>
+                    </div>
+                    <div className="mobile-cart-peek-total">
+                        <span>₹{(cartTotal + cartTax).toFixed(2)}</span>
+                        <span style={{ fontSize: 18, lineHeight: 1 }}>›</span>
+                    </div>
+                </button>
+            )}
 
             {/* RIGHT: Cart Panel */}
             <div ref={cartPanelRef} className={`pos-cart-panel${isCartOpen ? '' : ' is-collapsed'}`}>
@@ -518,23 +584,22 @@ const POS = () => {
                             setShowCart(!showCart);
                         }
                     }}
+                    style={{ cursor: isDesktopView ? 'default' : 'pointer' }}
                 >
-                    <div className="cart-header-title">
-                        <div className="cart-header-icon">
-                            <ShoppingCart size={18} />
-                        </div>
-                        <div>
-                            <h2>Current Order</h2>
-                            <p className="cart-header-sub">
-                                {cartItems.length === 0 ? 'No items added yet' : `${cartItems.length} item${cartItems.length > 1 ? 's' : ''} in cart`}
-                            </p>
-                        </div>
+                    <div className="flex items-center gap-2">
+                        <ShoppingCart size={20} className="text-muted" />
+                        <h2>Current Order</h2>
+                        {cartItems.length > 0 && (
+                            <span style={{ background: 'var(--accent-color)', color: '#fff', borderRadius: 999, fontSize: 11, fontWeight: 700, padding: '1px 7px', lineHeight: '18px' }}>
+                                {cartItems.reduce((s, i) => s + i.qty, 0)}
+                            </span>
+                        )}
                     </div>
-                    <div className="cart-header-meta">
-                        <div className="cart-trx-id">
-                            #TRX-{Math.floor(Math.random() * 1000)}
-                        </div>
-                        <div className={`cart-toggle-icon${isCartOpen ? '' : ' rotate-180'}`}>
+                    <div className="flex items-center gap-2">
+                        <div
+                            className={`cart-toggle-icon${isCartOpen ? '' : ' rotate-180'}`}
+                            style={{ fontSize: '1.2rem', color: '#64748b', transition: 'transform 0.3s' }}
+                        >
                             ▲
                         </div>
                     </div>
@@ -545,36 +610,39 @@ const POS = () => {
                 <>
                 <div className="cart-list custom-scrollbar">
                     {cartItems.length === 0 ? (
-                        <div className="cart-empty">
-                            <Package size={44} style={{ opacity: 0.4, marginBottom: '0.75rem' }} />
-                            <p>Your cart is empty</p>
-                            <span>Tap an item on the left to add it</span>
+                        <div className="h-full flex flex-col items-center justify-center text-muted">
+                            <Package size={48} style={{ opacity: 0.4, marginBottom: '1rem' }} />
+                            <p className="text-sm">No items yet</p>
                         </div>
                     ) : (
                         cartItems.map(item => (
                             <div key={item.id} className="cart-item">
-                                <div className="cart-item-row">
-                                    <div className="cart-item-info">
-                                        <h4 className="cart-item-name">{item.name}</h4>
-                                        <div className="cart-item-meta">₹{item.price} × {item.qty}</div>
+                                <div className="flex justify-between items-center">
+                                    <div className="flex-1 flex flex-col justify-center">
+                                        <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.125rem' }}>{item.name}</h4>
+                                        <div className="text-xs text-muted">₹{item.price} × {item.qty}</div>
                                     </div>
 
                                     <div className="cart-item-actions">
-                                        <div className="cart-item-qty">
+                                        <div className="cart-item-qty" style={{ border: '1px solid #e2e8f0', background: 'white' }}>
                                             <button
+                                                className="btn-icon"
+                                                style={{ padding: '0.25rem' }}
                                                 onClick={(e) => { e.stopPropagation(); updateQty(item.id, item.qty - 1); }}
                                             >
                                                 <Minus size={12} />
                                             </button>
-                                            <span className="cart-item-qty-value">{item.qty}</span>
+                                            <span style={{ width: '32px', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700 }}>{item.qty}</span>
                                             <button
+                                                className="btn-icon"
+                                                style={{ padding: '0.25rem' }}
                                                 onClick={(e) => { e.stopPropagation(); updateQty(item.id, item.qty + 1); }}
                                             >
                                                 <Plus size={12} />
                                             </button>
                                         </div>
 
-                                        <span className="cart-item-total">₹{(item.price * item.qty).toFixed(2)}</span>
+                                        <span className="cart-item-total" style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>₹{(item.price * item.qty).toFixed(2)}</span>
 
                                         <button
                                             className="btn-icon danger"
@@ -583,6 +651,30 @@ const POS = () => {
                                         >
                                             <Trash2 size={14} />
                                         </button>
+                                    </div>
+
+                                    {/* Per-item notes */}
+                                    <div style={{ marginTop: 4 }}>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); setExpandedNoteId(expandedNoteId === item.id ? null : item.id); }}
+                                            style={{ fontSize: 10, color: item.notes ? 'var(--accent-color)' : 'var(--text-light)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 3 }}
+                                        >
+                                            ✏ {item.notes ? `Note: ${item.notes}` : 'Add note'}
+                                        </button>
+                                        {expandedNoteId === item.id && (
+                                            <input
+                                                autoFocus
+                                                className="input"
+                                                type="text"
+                                                maxLength={80}
+                                                placeholder="e.g. no onion, extra spicy…"
+                                                value={item.notes || ''}
+                                                onChange={(e) => updateItemNotes(item.id, e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                style={{ fontSize: '0.75rem', padding: '4px 8px', marginTop: 4 }}
+                                            />
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -594,14 +686,15 @@ const POS = () => {
                 <div className="cart-footer">
                     {/* Customer Info Section */}
                     {cartItems.length > 0 && (
-                        <div className="customer-details-section">
-                            <h3>Customer Details (Optional)</h3>
-                            <div className="customer-details-fields">
+                        <div className="mb-4 pb-4 border-b" style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <h3 className="text-sm font-bold mb-3 text-main">Customer Details (Optional)</h3>
+                            <div className="flex flex-col gap-2">
                                 {isRetailer && (
                                     <select
                                         className="input"
                                         value={selectedPartyId}
                                         onChange={(e) => setSelectedPartyId(e.target.value)}
+                                        style={{ fontSize: '0.875rem', padding: '0.5rem 0.75rem' }}
                                     >
                                         <option value="">Select Party (Optional)</option>
                                         {parties.map((party) => (
@@ -617,6 +710,7 @@ const POS = () => {
                                     placeholder="Customer Name"
                                     value={customerName}
                                     onChange={(e) => setCustomerName(e.target.value)}
+                                    style={{ fontSize: '0.875rem', padding: '0.5rem 0.75rem' }}
                                 />
                                 <input
                                     className="input"
@@ -624,24 +718,100 @@ const POS = () => {
                                     placeholder="Phone Number (for WhatsApp)"
                                     value={customerPhone}
                                     onChange={(e) => setCustomerPhone(e.target.value)}
+                                    style={{ fontSize: '0.875rem', padding: '0.5rem 0.75rem' }}
                                 />
-                                <input
-                                    className="input"
-                                    type="text"
-                                    placeholder="Customer GSTIN (optional)"
-                                    value={customerGstin}
-                                    onChange={(e) => setCustomerGstin(e.target.value.toUpperCase())}
-                                />
+                                {/* Customer GSTIN removed to simplify cart UI */}
                             </div>
                             {customerPhone && (
-                                <p className="customer-whatsapp-hint">
-                                    <span className="icon-check">✓</span> Invoice will be sent via WhatsApp
+                                <p className="text-xs text-muted mt-2" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                    <span style={{ color: '#10b981' }}>✓</span> Invoice will be sent via WhatsApp
                                 </p>
                             )}
                         </div>
                     )}
 
-                    <div className="order-summary">
+                    {cartItems.length > 0 && (
+                        <div className="mb-3 pb-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 8 }}>Payment Method</p>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                                {['Cash', 'UPI', 'Card', 'Split'].map((mode) => (
+                                    <button
+                                        key={mode}
+                                        type="button"
+                                        onClick={() => setPaymentMode(mode)}
+                                        style={{
+                                            flex: '1 1 auto',
+                                            padding: '6px 10px',
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            borderRadius: 8,
+                                            border: `1.5px solid ${paymentMode === mode ? 'var(--accent-color)' : 'var(--border-color)'}`,
+                                            background: paymentMode === mode ? 'var(--accent-light)' : 'white',
+                                            color: paymentMode === mode ? 'var(--accent-color)' : 'var(--text-muted)',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s',
+                                        }}
+                                    >
+                                        {mode === 'Cash' ? '💵' : mode === 'UPI' ? '📱' : mode === 'Card' ? '💳' : '⚖️'} {mode}
+                                    </button>
+                                ))}
+                            </div>
+                            {(paymentMode === 'UPI' || paymentMode === 'Card') && (
+                                <input
+                                    className="input"
+                                    type="text"
+                                    placeholder={paymentMode === 'UPI' ? 'UPI Ref / UTR number' : 'Card last 4 digits / ref'}
+                                    value={transactionId}
+                                    onChange={(e) => setTransactionId(e.target.value)}
+                                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.6rem' }}
+                                />
+                            )}
+                        </div>
+                    )}
+
+                    {cartItems.length > 0 && (
+                        <div className="mb-3 pb-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 8 }}>Discount</p>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                                <div style={{ display: 'flex', borderRadius: 8, border: '1.5px solid var(--border-color)', overflow: 'hidden', flexShrink: 0 }}>
+                                    {['flat', 'percent'].map((t) => (
+                                        <button
+                                            key={t}
+                                            type="button"
+                                            onClick={() => setDiscountType(t)}
+                                            style={{
+                                                padding: '6px 10px', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
+                                                background: discountType === t ? 'var(--accent-color)' : 'white',
+                                                color: discountType === t ? '#fff' : 'var(--text-muted)',
+                                            }}
+                                        >
+                                            {t === 'flat' ? '₹' : '%'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <input
+                                    className="input"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder={discountType === 'percent' ? 'e.g. 10' : 'e.g. 50'}
+                                    value={discountValue || ''}
+                                    onChange={(e) => setDiscountValue(Math.max(0, Number(e.target.value)))}
+                                    style={{ flex: 1, fontSize: '0.8rem', padding: '0.4rem 0.6rem' }}
+                                />
+                                {discountValue > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setDiscountValue(0)}
+                                        style={{ padding: '0 8px', background: 'var(--danger-light)', color: 'var(--danger-color)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                                        title="Clear discount"
+                                    >✕</button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="mb-3">
                         <div className="summary-row">
                             <span>Subtotal</span>
                             <span>₹{cartTotal.toFixed(2)}</span>
@@ -650,47 +820,101 @@ const POS = () => {
                             <span>Tax ({user?.tax_rate || 0}%)</span>
                             <span>₹{cartTax.toFixed(2)}</span>
                         </div>
+                        {discountAmount > 0 && (
+                            <div className="summary-row" style={{ color: 'var(--success-color)' }}>
+                                <span>Discount {discountType === 'percent' ? `(${discountValue}%)` : ''}</span>
+                                <span>−₹{discountAmount.toFixed(2)}</span>
+                            </div>
+                        )}
                         <div className="total-row">
                             <span>Total</span>
-                            <span>₹{(cartTotal + cartTax).toFixed(2)}</span>
+                            <span>₹{grandTotal.toFixed(2)}</span>
                         </div>
                     </div>
 
-                    {/* Success Message with WhatsApp Button */}
+                    {/* Success / Queued message */}
                     {lastInvoice && (
-                        <div className="order-success-card">
-                            <div className="order-success-header">
-                                <span className="order-success-icon">✓</span>
-                                <h3>Order Completed!</h3>
-                            </div>
-                            <p>
-                                Invoice #{lastInvoice.invoice_number} created successfully
-                            </p>
-                            {lastInvoice.customer_phone && (
-                                <button
-                                    className="whatsapp-btn"
-                                    onClick={() => shareWhatsApp(lastInvoice)}
-                                >
-                                    <Smartphone size={16} />
-                                    Send Invoice via WhatsApp
-                                </button>
-                            )}
-                            {!lastInvoice.customer_phone && (
-                                <p className="order-success-hint">
-                                    Add phone number to send via WhatsApp
+                        lastInvoice._offline ? (
+                            /* ── Offline: invoice was queued ── */
+                            <div className="mb-4 p-4 border" style={{ background: '#fffbeb', borderColor: '#fcd34d' }}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span style={{ fontSize: '1.25rem' }}>📶</span>
+                                    <h3 className="text-sm font-bold" style={{ color: '#92400e' }}>Order Queued Offline</h3>
+                                </div>
+                                <p className="text-xs mb-1" style={{ color: '#78350f' }}>
+                                    Ref: <strong>{lastInvoice.invoice_number}</strong>
                                 </p>
-                            )}
-                            <button
-                                className="order-success-new-btn"
-                                onClick={() => setLastInvoice(null)}
-                            >
-                                Start New Order
-                            </button>
-                        </div>
+                                <p className="text-xs mb-3" style={{ color: '#92400e' }}>
+                                    This invoice is saved on your device and will sync to the server automatically when you're back online.
+                                </p>
+                                <button
+                                    className="text-xs text-muted mt-2 w-full text-center"
+                                    onClick={() => setLastInvoice(null)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                                >
+                                    Start New Order
+                                </button>
+                            </div>
+                        ) : (
+                            /* ── Online: invoice created on server ── */
+                            <div className="mb-4 p-4 border" style={{ background: '#f0fdf4', borderColor: '#86efac' }}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span style={{ color: '#16a34a', fontSize: '1.25rem' }}>✓</span>
+                                    <h3 className="text-sm font-bold" style={{ color: '#16a34a' }}>Order Completed!</h3>
+                                </div>
+                                <p className="text-xs mb-3" style={{ color: '#15803d' }}>
+                                    Invoice #{lastInvoice.invoice_number} created successfully
+                                </p>
+                                {lastInvoice.customer_phone && (
+                                    <button
+                                        className="btn w-full"
+                                        onClick={() => shareWhatsApp(lastInvoice)}
+                                        style={{ background: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                                    >
+                                        <Smartphone size={16} />
+                                        Send Invoice via WhatsApp
+                                    </button>
+                                )}
+                                {!lastInvoice.customer_phone && (
+                                    <p className="text-xs text-center text-muted">
+                                        Add phone number to send via WhatsApp
+                                    </p>
+                                )}
+                                <button
+                                    className="text-xs text-muted mt-2 w-full text-center"
+                                    onClick={() => setLastInvoice(null)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                                >
+                                    Start New Order
+                                </button>
+                            </div>
+                        )
                     )}
 
-                    {/* Complete Order Button */}
-                    <div className="cart-actions">
+                    <div className="cart-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <button
+                            type="button"
+                            className="btn w-full"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (!cartItems?.length) return;
+                                setShowKOTOptions(true);
+                            }}
+                            disabled={!cartItems?.length}
+                            aria-label="Print / Send Kitchen Order"
+                            style={{
+                                background: '#f59e0b',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px'
+                            }}
+                        >
+                            <Printer size={16} />
+                            PRINT TO KITCHEN
+                        </button>
+
                         <button
                             type="button"
                             className="btn w-full cart-complete-btn"
@@ -699,16 +923,49 @@ const POS = () => {
                                 e.stopPropagation();
                                 handleCheckout();
                             }}
-                            disabled={!!(loading || !cartItems?.length)}
+                            disabled={!!(checkoutLoading || isAttendee || !cartItems?.length)}
                             aria-label="Complete order and create invoice"
                         >
-                            {loading ? "Processing…" : "COMPLETE ORDER"}
+                            {checkoutLoading ? "Processing…" : "COMPLETE ORDER"}
                         </button>
                     </div>
                 </div>
                 </>
                 )}
             </div>
+
+            {/* KOT Options Modal */}
+            {showKOTOptions && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+                    <div style={{ width: 360, background: '#fff', borderRadius: 8, padding: 16, boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+                        <h3 style={{ margin: 0, marginBottom: 12 }}>Send order to kitchen</h3>
+                        <p style={{ marginTop: 0, marginBottom: 12, color: '#374151' }}>Choose how to send this order to the kitchen.</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <button className="btn" onClick={async () => await sendToKOTDisplay()} style={{ background: '#06b6d4', color: '#fff' }}>Send to KOT Display</button>
+                            {!isAttendee && (
+                                <button className="btn" onClick={() => printViaBluetooth()} style={{ background: '#f59e0b', color: '#fff' }}>Print via Bluetooth</button>
+                            )}
+                            <button className="btn" onClick={() => setShowKOTOptions(false)} style={{ background: '#efefef' }}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* KOT Print Dialog */}
+            <KOTPrintDialog
+                isOpen={showKOTPrint}
+                order={{ items: cartItems }}
+                tableInfo={isRetailer ? null : selectedTable}
+                businessName={user?.business_name || 'Ailexity POS'}
+                autoPrint={autoPrintKOT}
+                onClose={() => {
+                    setShowKOTPrint(false);
+                    setAutoPrintKOT(false);
+                }}
+                onSuccess={() => {
+                    refreshKotStatuses();
+                }}
+            />
         </div>
     );
 };

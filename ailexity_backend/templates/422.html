@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>422 Unprocessable Entity - Ailexity POS</title>
+    <style>
+      body { font-family: Inter, Arial, sans-serif; background:#f8fafc; color:#0f172a; display:flex; align-items:center; justify-content:center; height:100vh; }
+      .card { background:white; padding:28px; border-radius:10px; box-shadow:0 6px 18px rgba(2,6,23,0.08); max-width:720px; width:100%; }
+      h1 { margin:0 0 8px 0; font-size:22px }
+      ul { color:#475569 }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>422 — Validation Error</h1>
+      <p>There were problems with the data you sent:</p>
+      <ul>
+        {% for err in errors %}
+          <li>{{ err['loc'] | join('.') }}: {{ err['msg'] }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </body>
+</html>

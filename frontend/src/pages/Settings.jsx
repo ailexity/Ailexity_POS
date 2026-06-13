@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
-import { Settings as SettingsIcon, Save, Eye, EyeOff, Building, Lock, Grid3x3, Plus, Edit2, Trash2, FileText, CreditCard, Keyboard, AlertCircle, Check, LogOut } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Eye, EyeOff, Building, Lock, Grid3x3, Plus, Edit2, Trash2, FileText, CreditCard, Keyboard, AlertCircle, Check, LogOut, MessageCircle } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import ConfirmModal from '../components/ConfirmModal';
 import './Settings.css';
 
 const normalizeBusinessType = (businessType) => {
@@ -25,7 +26,6 @@ const Settings = () => {
         email: '',
         full_name: '',
         business_address: '',
-        business_type: '',
         tax_id: '',
         store_email: '',
         store_phone: '',
@@ -59,6 +59,18 @@ const Settings = () => {
     });
     const [tableMessage, setTableMessage] = useState({ type: '', text: '' });
 
+    // Confirmation dialog state
+    const [confirm, setConfirm] = useState({ open: false, tableId: null, tableName: '' });
+    const [confirmLoading, setConfirmLoading] = useState(false);
+
+    // WhatsApp Integration state
+    const [waStatus, setWaStatus] = useState(null); // WhatsAppConfigStatus
+    const [waForm, setWaForm] = useState({ phone_number_id: '', access_token: '', from_display: '', message_type: 'text', template_name: '', enabled: true });
+    const [waMessage, setWaMessage] = useState({ type: '', text: '' });
+    const [waTesting, setWaTesting] = useState(false);
+    const [waSaving, setWaSaving] = useState(false);
+    const [showWaToken, setShowWaToken] = useState(false);
+
     useEffect(() => {
         if (currentUser) {
             setFormData(prev => ({
@@ -70,7 +82,6 @@ const Settings = () => {
                 email: currentUser.email || '',
                 full_name: currentUser.full_name || '',
                 business_address: currentUser.business_address || '',
-                business_type: normalizeBusinessType(currentUser.business_type) || '',
                 tax_id: currentUser.tax_id || '',
                 store_email: currentUser.store_email || '',
                 store_phone: currentUser.store_phone || '',
@@ -92,6 +103,9 @@ const Settings = () => {
     useEffect(() => {
         if (!isRestaurantBusiness && activeTab === 'tables') {
             setActiveTab('business');
+        }
+        if (activeTab === 'whatsapp' && waStatus === null) {
+            fetchWaStatus();
         }
     }, [isRestaurantBusiness, activeTab]);
 
@@ -125,16 +139,22 @@ const Settings = () => {
         }
     };
 
-    const handleDeleteTable = async (tableId) => {
-        if (!window.confirm('Are you sure you want to delete this table?')) return;
+    const handleDeleteTable = (tableId, tableName) => {
+        setConfirm({ open: true, tableId, tableName });
+    };
 
+    const confirmDeleteTable = async () => {
+        setConfirmLoading(true);
         try {
-            await api.delete(`/tables/${tableId}`);
+            await api.delete(`/tables/${confirm.tableId}`);
             setTableMessage({ type: 'success', text: 'Table deleted successfully' });
             fetchTables();
             setTimeout(() => setTableMessage({ type: '', text: '' }), 3000);
         } catch (error) {
             setTableMessage({ type: 'error', text: 'Error deleting table' });
+        } finally {
+            setConfirmLoading(false);
+            setConfirm({ open: false, tableId: null, tableName: '' });
         }
     };
 
@@ -163,6 +183,76 @@ const Settings = () => {
         });
     };
 
+    const fetchWaStatus = async () => {
+        try {
+            const res = await api.get('/whatsapp/status');
+            setWaStatus(res.data);
+            setWaForm(prev => ({
+                ...prev,
+                from_display: res.data.from_display || '',
+                message_type: res.data.message_type || 'text',
+                template_name: res.data.template_name || '',
+                enabled: res.data.enabled ?? true,
+                // Don't populate the secret fields — user must re-enter to update
+                phone_number_id: '',
+                access_token: '',
+            }));
+        } catch {
+            // WhatsApp never configured — normal
+        }
+    };
+
+    const handleWaSave = async (e) => {
+        e.preventDefault();
+        if (!waForm.phone_number_id || !waForm.access_token || !waForm.from_display) {
+            setWaMessage({ type: 'error', text: 'Phone Number ID, Access Token and Display Number are all required.' });
+            return;
+        }
+        setWaSaving(true);
+        setWaMessage({ type: '', text: '' });
+        try {
+            await api.put('/whatsapp/config', {
+                phone_number_id: waForm.phone_number_id,
+                access_token: waForm.access_token,
+                from_display: waForm.from_display,
+                message_type: waForm.message_type,
+                template_name: waForm.template_name || null,
+                enabled: waForm.enabled,
+            });
+            setWaMessage({ type: 'success', text: 'WhatsApp configuration saved.' });
+            fetchWaStatus();
+        } catch (err) {
+            setWaMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to save.' });
+        } finally {
+            setWaSaving(false);
+        }
+    };
+
+    const handleWaTest = async () => {
+        setWaTesting(true);
+        setWaMessage({ type: '', text: '' });
+        try {
+            await api.post('/whatsapp/test');
+            setWaMessage({ type: 'success', text: 'Test message sent! Check the WhatsApp number you configured.' });
+        } catch (err) {
+            setWaMessage({ type: 'error', text: err.response?.data?.detail || 'Test failed.' });
+        } finally {
+            setWaTesting(false);
+        }
+    };
+
+    const handleWaDisconnect = async () => {
+        setWaMessage({ type: '', text: '' });
+        try {
+            await api.delete('/whatsapp/config');
+            setWaStatus(null);
+            setWaForm({ phone_number_id: '', access_token: '', from_display: '', message_type: 'text', template_name: '', enabled: true });
+            setWaMessage({ type: 'success', text: 'WhatsApp integration removed.' });
+        } catch (err) {
+            setWaMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to remove.' });
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage({ type: '', text: '' });
@@ -182,7 +272,6 @@ const Settings = () => {
                 email: formData.email,
                 full_name: formData.full_name,
                 business_address: formData.business_address,
-                business_type: formData.business_type,
                 tax_id: formData.tax_id,
                 store_email: formData.store_email,
                 store_phone: formData.store_phone,
@@ -431,6 +520,7 @@ const Settings = () => {
                         {isRestaurantBusiness && (
                             <TabButton active={activeTab === 'tables'} onClick={() => setActiveTab('tables')} icon={Grid3x3}>Tables</TabButton>
                         )}
+                        <TabButton active={activeTab === 'whatsapp'} onClick={() => setActiveTab('whatsapp')} icon={MessageCircle}>WhatsApp</TabButton>
                         <TabButton active={activeTab === 'shortcuts'} onClick={() => setActiveTab('shortcuts')} icon={Keyboard}>Shortcuts</TabButton>
                         <TabButton active={activeTab === 'security'} onClick={() => setActiveTab('security')} icon={Lock}>Security</TabButton>
                     </div>
@@ -460,18 +550,6 @@ const Settings = () => {
                                             />
                                         </FormField>
 
-                                        <FormField label="Business Type" help="Choose Restaurant or Retailer">
-                                            <select
-                                                className="input"
-                                                value={formData.business_type}
-                                                onChange={e => setFormData({ ...formData, business_type: e.target.value })}
-                                                required
-                                            >
-                                                <option value="">Select Type</option>
-                                                <option value="restaurant">Restaurant</option>
-                                                <option value="retailer">Retailer</option>
-                                            </select>
-                                        </FormField>
                                     </FormGroup>
                                 </FormSection>
 
@@ -741,6 +819,127 @@ const Settings = () => {
                                         Save Changes
                                     </button>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* WhatsApp Tab */}
+                        {activeTab === 'whatsapp' && (
+                            <div className="settings-panel" style={{ backgroundColor: 'white', borderRadius: '12px', padding: '32px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}>
+                                <SectionHeader
+                                    title="WhatsApp Business API"
+                                    subtitle="Send invoices directly from your WhatsApp Business number — no browser redirect"
+                                    icon="📲"
+                                />
+
+                                {/* Status indicator */}
+                                {waStatus && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, background: waStatus.has_credentials && waStatus.enabled ? '#f0fdf4' : '#fef3c7', border: `1px solid ${waStatus.has_credentials && waStatus.enabled ? '#86efac' : '#fcd34d'}`, marginBottom: 24 }}>
+                                        <span style={{ fontSize: 18 }}>{waStatus.has_credentials && waStatus.enabled ? '✅' : '⚠️'}</span>
+                                        <div>
+                                            <strong style={{ fontSize: 13 }}>{waStatus.has_credentials && waStatus.enabled ? 'Connected' : 'Not configured'}</strong>
+                                            {waStatus.from_display && <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Sending from: {waStatus.from_display}</p>}
+                                        </div>
+                                        {waStatus.has_credentials && (
+                                            <button type="button" onClick={handleWaDisconnect} style={{ marginLeft: 'auto', fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                                                Disconnect
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* How it works info box */}
+                                <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '14px 16px', marginBottom: 24 }}>
+                                    <p style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 700, color: '#0369a1' }}>How to set up (one-time)</p>
+                                    <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#0c4a6e', lineHeight: 1.7 }}>
+                                        <li>Go to <strong>developers.facebook.com</strong> → Create App → Business type</li>
+                                        <li>Add <strong>WhatsApp</strong> product → Set up phone number</li>
+                                        <li>Copy your <strong>Phone Number ID</strong> and <strong>Permanent System Token</strong></li>
+                                        <li>Paste them below and hit Save</li>
+                                    </ol>
+                                    <p style={{ margin: '8px 0 0', fontSize: 11, color: '#0369a1' }}>
+                                        <strong>Message mode:</strong> "Text" works within 24 h after customer contacts you. "Template" works anytime (requires a pre-approved Meta template — set up once in WhatsApp Manager).
+                                    </p>
+                                </div>
+
+                                {waMessage.text && (
+                                    <div style={{ padding: '10px 14px', borderRadius: 8, marginBottom: 20, fontSize: 13, fontWeight: 500, background: waMessage.type === 'success' ? '#f0fdf4' : '#fef2f2', color: waMessage.type === 'success' ? '#16a34a' : '#dc2626', border: `1px solid ${waMessage.type === 'success' ? '#86efac' : '#fca5a5'}` }}>
+                                        {waMessage.text}
+                                    </div>
+                                )}
+
+                                <form onSubmit={handleWaSave}>
+                                    <div style={{ display: 'grid', gap: 18 }}>
+                                        <div>
+                                            <label className="label-text">Phone Number ID <span style={{ color: '#ef4444' }}>*</span></label>
+                                            <input className="input" type="text" placeholder="123456789012345" value={waForm.phone_number_id}
+                                                onChange={e => setWaForm(f => ({ ...f, phone_number_id: e.target.value }))} />
+                                            <p style={{ margin: '4px 0 0', fontSize: 11, color: '#94a3b8' }}>Found in Meta WhatsApp Manager → Phone Numbers → Settings</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="label-text">Access Token (System Token) <span style={{ color: '#ef4444' }}>*</span></label>
+                                            <div style={{ position: 'relative' }}>
+                                                <input className="input" type={showWaToken ? 'text' : 'password'} placeholder="Enter token (will be stored securely)" value={waForm.access_token}
+                                                    onChange={e => setWaForm(f => ({ ...f, access_token: e.target.value }))}
+                                                    style={{ paddingRight: 40 }} />
+                                                <button type="button" onClick={() => setShowWaToken(v => !v)}
+                                                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                                                    {showWaToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                </button>
+                                            </div>
+                                            <p style={{ margin: '4px 0 0', fontSize: 11, color: '#94a3b8' }}>Create a permanent System User Token in Meta Business Settings for production use</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="label-text">WhatsApp Business Phone Number <span style={{ color: '#ef4444' }}>*</span></label>
+                                            <input className="input" type="text" placeholder="+919876543210" value={waForm.from_display}
+                                                onChange={e => setWaForm(f => ({ ...f, from_display: e.target.value }))} />
+                                            <p style={{ margin: '4px 0 0', fontSize: 11, color: '#94a3b8' }}>The number registered with WhatsApp Business (include country code)</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="label-text">Message Mode</label>
+                                            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                                                {[['text', '💬 Text (within 24 h)'], ['template', '📋 Template (always)']].map(([val, label]) => (
+                                                    <label key={val} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', border: `1.5px solid ${waForm.message_type === val ? 'var(--accent-color)' : 'var(--border-color)'}`, borderRadius: 8, cursor: 'pointer', flex: 1, background: waForm.message_type === val ? 'var(--accent-light)' : 'white' }}>
+                                                        <input type="radio" name="wa_mode" value={val} checked={waForm.message_type === val} onChange={() => setWaForm(f => ({ ...f, message_type: val }))} style={{ accentColor: 'var(--accent-color)' }} />
+                                                        <span style={{ fontSize: 13, fontWeight: 600, color: waForm.message_type === val ? 'var(--accent-color)' : 'var(--text-muted)' }}>{label}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {waForm.message_type === 'template' && (
+                                            <div>
+                                                <label className="label-text">Template Name</label>
+                                                <input className="input" type="text" placeholder="e.g. invoice_notification" value={waForm.template_name}
+                                                    onChange={e => setWaForm(f => ({ ...f, template_name: e.target.value }))} />
+                                                <p style={{ margin: '4px 0 0', fontSize: 11, color: '#94a3b8' }}>Name of your approved template in WhatsApp Manager (parameters: customer_name, business_name, invoice_number, amount)</p>
+                                            </div>
+                                        )}
+
+                                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                                <input type="checkbox" checked={waForm.enabled} onChange={e => setWaForm(f => ({ ...f, enabled: e.target.checked }))} style={{ accentColor: 'var(--accent-color)', width: 16, height: 16 }} />
+                                                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>Enable WhatsApp API sending</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: 10, marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border-color)' }}>
+                                        <button type="submit" className="btn" disabled={waSaving} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <Save size={15} />
+                                            {waSaving ? 'Saving…' : 'Save Configuration'}
+                                        </button>
+                                        {waStatus?.has_credentials && (
+                                            <button type="button" className="btn" onClick={handleWaTest} disabled={waTesting}
+                                                style={{ background: '#25D366', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <MessageCircle size={15} />
+                                                {waTesting ? 'Sending…' : 'Send Test Message'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </form>
                             </div>
                         )}
 
@@ -1130,7 +1329,7 @@ const Settings = () => {
                                                     Edit
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDeleteTable(table.id)}
+                                                    onClick={() => handleDeleteTable(table.id, table.table_name || table.table_number)}
                                                     style={{
                                                         flex: 1,
                                                         padding: '10px',
@@ -1315,6 +1514,17 @@ const Settings = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={confirm.open}
+                variant="danger"
+                title={`Delete "${confirm.tableName}"?`}
+                message="This table will be permanently removed. Any active carts for this table will be lost. This cannot be undone."
+                confirmLabel="Delete Table"
+                onConfirm={confirmDeleteTable}
+                onCancel={() => setConfirm({ open: false, tableId: null, tableName: '' })}
+                loading={confirmLoading}
+            />
         </div>
     );
 };

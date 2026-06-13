@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Error - Ailexity POS</title>
+    <style>
+      body { font-family: Inter, Arial, sans-serif; background:#f8fafc; color:#0f172a; display:flex; align-items:center; justify-content:center; height:100vh; }
+      .card { background:white; padding:28px; border-radius:10px; box-shadow:0 6px 18px rgba(2,6,23,0.08); max-width:720px; width:100%; }
+      h1 { margin:0 0 8px 0; font-size:22px }
+      p { color:#475569 }
+      .meta { margin-top:16px; font-size:13px; color:#64748b }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Something went wrong</h1>
+      <p>We ran into an unexpected problem while handling your request. Please try again or contact support if the issue persists.</p>
+      <div class="meta">Status: {{ status_code if status_code else 'Error' }} — {{ detail }}</div>
+    </div>
+  </body>
+</html>

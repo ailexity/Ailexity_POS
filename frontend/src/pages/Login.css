@@ -225,12 +225,6 @@
 .link-btn:hover {
     color: var(--accent-hover);
 }
-    transition: color 0.2s ease;
-}
-
-.link-btn:hover {
-    color: #111827;
-}
 
 .error-message {
     display: flex;
@@ -470,8 +464,8 @@
 .access-input:focus,
 .access-textarea:focus {
     outline: none;
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(16, 138, 133, 0.12);
 }
 
 .access-textarea {
@@ -482,10 +476,10 @@
 .access-submit-btn {
     width: 100%;
     padding: 12px 20px;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     border: none;
-    background: #6366f1;
-    color: white;
+    background: var(--accent-color);
+    color: #ffffff;
     font-size: 0.9375rem;
     font-weight: 600;
     cursor: pointer;
@@ -497,7 +491,7 @@
 }
 
 .access-submit-btn:hover:not(:disabled) {
-    background: #4f46e5;
+    background: var(--accent-hover);
     transform: translateY(-1px);
 }
 

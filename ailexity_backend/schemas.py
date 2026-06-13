@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 
 # --- User Schemas ---
@@ -32,6 +32,7 @@ class UserBase(BaseModel):
     active_window_end: Optional[str] = None  # Login access end date (YYYY-MM-DD)
     enable_multi_device_sync: Optional[bool] = False  # Enable multi-device cart sync
     enable_order_management: Optional[bool] = False  # Enable order management feature
+    features: Optional[Dict[str, bool]] = None  # Managed access flags for user features
 
 class UserCreate(UserBase):
     password: str
@@ -76,6 +77,7 @@ class UserLogin(BaseModel):
 class UserResponse(UserBase):
     id: str  # MongoDB ObjectId as string
     is_active: bool
+    is_verified: Optional[bool] = False
     subscription_status: str = "active"
     active_window_start: Optional[str] = None  # Login access start date
     active_window_end: Optional[str] = None  # Login access end date
@@ -187,6 +189,48 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+
+class OTPVerify(BaseModel):
+    username_or_email: str
+    otp: str
+
+
+class GoogleLogin(BaseModel):
+    email: str
+    google_id: str
+    remember_me: Optional[bool] = False
+
+
+class AttendeeCreate(BaseModel):
+    username: str
+    password: str
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = 'attendee'
+
+
+class AttendeeUpdate(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+
+
+class AttendeeResponse(BaseModel):
+    id: str
+    username: str
+    full_name: Optional[str]
+    phone: Optional[str]
+    email: Optional[str]
+    role: str
+    is_active: bool
+    admin_id: Optional[str] = None
+    class Config:
+        from_attributes = True
 
 # --- System Settings Schemas ---
 class SystemPasswordChange(BaseModel):
@@ -430,3 +474,44 @@ class PartyDueAlertResponse(BaseModel):
     due_date: datetime
     days_overdue: int
 
+
+# --- Feature Management Schemas ---
+class UserFeatures(BaseModel):
+    """User feature permissions"""
+    stock_management: bool = True
+    ledger_management: bool = True
+    parties_management: bool = True
+    items_management: bool = True
+    pos_billing: bool = True
+    invoices: bool = True
+    alerts: bool = True
+    dashboard: bool = True
+    admin_panel: bool = True
+    kot_printing: bool = True
+    order_management: bool = True
+    payment_tracking: bool = True
+
+
+class FeaturesUpdateRequest(BaseModel):
+    """Request to update user features"""
+    features: dict
+
+
+class UserFeaturesResponse(BaseModel):
+    """Response for user features"""
+    user_id: str
+    username: str
+    features: UserFeatures
+
+
+class AvailableFeature(BaseModel):
+    """Available feature information"""
+    name: str
+    description: str
+    icon: str
+
+
+class AvailableFeaturesResponse(BaseModel):
+    """Response with all available features"""
+    available_features: dict
+    total_features: int

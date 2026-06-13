@@ -144,7 +144,7 @@ const AlertsManagement = () => {
     // Password Protection Screen
     if (!isAuthenticated) {
         return (
-            <div className="page-container" style={{ 
+            <div className="page-container sysadmin-page" style={{ 
                 background: '#f8fafc',
                 display: 'flex',
                 alignItems: 'center',
@@ -290,7 +290,7 @@ const AlertsManagement = () => {
     }
 
     return (
-        <div className="page-container with-mobile-header-offset" style={{ background: '#f8fafc' }}>
+        <div className="page-container with-mobile-header-offset sysadmin-page" style={{ background: '#f8fafc' }}>
             {/* Header */}
             <PageHeader 
                 icon={Bell}

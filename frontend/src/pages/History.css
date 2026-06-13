@@ -1,20 +1,22 @@
-/* History Page - Minimal White Theme */
+/* History Page - landing page theme */
 
 .history-page {
     min-height: 100vh;
-    background: #ffffff;
+    background: var(--bg-color);
     display: flex;
     flex-direction: column;
 }
 
 /* Header Section */
 .history-header {
-    background: #ffffff;
-    border-bottom: 1px solid #e5e7eb;
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid var(--border-light);
     padding: 24px 32px;
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 20;
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-sm);
 }
 
 .history-title-section {
@@ -25,11 +27,11 @@
 }
 
 .history-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    background: #f3f4f6;
-    color: #111827;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: var(--accent-light);
+    color: var(--accent-color);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -37,8 +39,8 @@
 
 .history-title {
     font-size: 1.75rem;
-    font-weight: 700;
-    color: #111827;
+    font-weight: 800;
+    color: var(--text-main);
     margin: 0;
 }
 
@@ -54,14 +56,14 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: #f9fafb;
+    background: var(--card-bg);
     padding: 10px 16px;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-light);
 }
 
 .date-filter-group svg {
-    color: #6b7280;
+    color: var(--text-light);
 }
 
 .history-date-input {
@@ -69,7 +71,7 @@
     background: transparent;
     padding: 4px 8px;
     font-size: 0.9rem;
-    color: #111827;
+    color: var(--text-main);
     font-weight: 500;
     outline: none;
     cursor: pointer;
@@ -80,7 +82,7 @@
 }
 
 .date-separator {
-    color: #9ca3af;
+    color: var(--text-muted);
     font-weight: 500;
 }
 
@@ -96,30 +98,67 @@
     left: 14px;
     top: 50%;
     transform: translateY(-50%);
-    color: #9ca3af;
+    color: var(--text-light);
     pointer-events: none;
 }
 
 .history-search-input {
     width: 100%;
     padding: 10px 16px 10px 42px;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    background: #f9fafb;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    background: var(--card-bg);
     font-size: 0.9rem;
-    color: #111827;
+    color: var(--text-main);
     transition: all 0.2s ease;
     outline: none;
 }
 
 .history-search-input:focus {
     background: #ffffff;
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(16, 138, 133, 0.12);
 }
 
 .history-search-input::placeholder {
-    color: #9ca3af;
+    color: var(--text-light);
+}
+
+.history-search-btn,
+.history-clear-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 16px;
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.history-search-btn {
+    background: var(--accent-color);
+    color: #ffffff;
+}
+
+.history-clear-btn {
+    background: var(--border-light);
+    color: var(--text-main);
+}
+
+.history-search-btn:hover:not(:disabled),
+.history-clear-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 138, 133, 0.16);
+}
+
+.history-search-btn:disabled,
+.history-clear-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
 .history-download-btn {
@@ -127,10 +166,10 @@
     align-items: center;
     gap: 8px;
     padding: 10px 20px;
-    background: #111827;
+    background: var(--accent-color);
     color: #ffffff;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
@@ -139,14 +178,14 @@
 }
 
 .history-download-btn:hover:not(:disabled) {
-    background: #1f2937;
+    background: var(--accent-hover);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px rgba(16, 138, 133, 0.24);
 }
 
 .history-download-btn:disabled {
-    background: #e5e7eb;
-    color: #9ca3af;
+    background: var(--border-light);
+    color: var(--text-light);
     cursor: not-allowed;
 }
 
@@ -161,11 +200,11 @@
 
 /* Table Container */
 .history-table-container {
-    background: #ffffff;
-    border-radius: 12px;
-    border: 1px solid #e5e7eb;
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-light);
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow-sm);
 }
 
 .history-table {
@@ -215,9 +254,9 @@
 .history-invoice-badge {
     display: inline-block;
     padding: 6px 12px;
-    background: #eff6ff;
-    color: #1e40af;
-    border-radius: 6px;
+    background: rgba(16, 138, 133, 0.12);
+    color: var(--accent-color);
+    border-radius: var(--radius-md);
     font-weight: 600;
     font-size: 0.85rem;
     font-family: 'Courier New', monospace;
@@ -317,21 +356,21 @@
 }
 
 .history-modal {
-    background: #ffffff;
-    border-radius: 16px;
+    background: var(--card-bg);
+    border-radius: var(--radius-xl);
     width: 100%;
     max-width: 600px;
     max-height: 90vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--shadow-lg);
     animation: slideUp 0.3s ease;
 }
 
 .history-modal-header {
     padding: 24px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-light);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -473,7 +512,7 @@
 .history-modal-total-amount {
     font-size: 1.5rem;
     font-weight: 700;
-    color: #6366f1;
+    color: var(--accent-color);
 }
 
 .history-modal-buttons {
@@ -508,14 +547,14 @@
 }
 
 .history-modal-btn.view {
-    background: #6366f1;
+    background: var(--accent-color);
     color: #ffffff;
 }
 
 .history-modal-btn.view:hover {
-    background: #4f46e5;
+    background: var(--accent-hover);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 4px 12px rgba(16, 138, 133, 0.24);
 }
 
 /* Animations */
@@ -567,9 +606,15 @@
         width: 100%;
     }
 
+    .history-filters > * {
+        min-width: 0;
+    }
+
     .date-filter-group {
         width: 100%;
         justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
     }
 
     .history-search-wrapper {
@@ -577,6 +622,8 @@
         width: 100%;
     }
 
+    .history-search-btn,
+    .history-clear-btn,
     .history-download-btn {
         width: 100%;
         justify-content: center;
@@ -598,9 +645,12 @@
     .history-table tbody tr {
         display: grid;
         grid-template-columns: 1fr;
-        gap: 8px;
-        padding: 14px 16px;
-        border-bottom: 1px solid #e5e7eb;
+        gap: 10px;
+        padding: 16px;
+        border: none;
+        border-radius: 16px;
+        background: #ffffff;
+        box-shadow: 0 10px 18px rgba(15, 23, 42, 0.04);
     }
 
     .history-table tbody tr:last-child {
@@ -608,13 +658,14 @@
     }
 
     .history-table tbody tr:hover {
-        background: #f9fafb;
+        background: #f8fafc;
     }
 
     .history-table td {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
         padding: 0;
         border: none;
     }
@@ -627,6 +678,8 @@
         text-transform: uppercase;
         letter-spacing: 0.3px;
         flex-shrink: 0;
+        margin-bottom: 6px;
+        display: block;
     }
 
     .history-invoice-badge {
@@ -635,10 +688,10 @@
     }
 
     .history-date-cell {
-        flex-direction: row;
+        flex-direction: column;
         gap: 6px;
-        align-items: center;
-        justify-content: flex-end;
+        align-items: flex-start;
+        justify-content: flex-start;
     }
 
     .history-date-time {
@@ -651,18 +704,19 @@
     }
 
     .history-customer-name {
-        text-align: right;
+        text-align: left;
         font-size: 0.9rem;
     }
 
     .history-amount {
-        text-align: right;
+        text-align: left;
         font-size: 1rem;
     }
 
     .history-actions {
-        justify-content: flex-end;
-        gap: 6px;
+        justify-content: flex-start;
+        gap: 10px;
+        width: 100%;
     }
 
     .history-action-btn {
