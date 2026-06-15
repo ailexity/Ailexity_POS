@@ -608,9 +608,10 @@ const POS = () => {
                 {/* Cart Items - Collapsible */}
                 {isCartOpen && (
                 <>
-                <div className="cart-list custom-scrollbar">
+                <div className="cart-scroll custom-scrollbar">
+                <div className="cart-list">
                     {cartItems.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-muted">
+                        <div className="cart-empty h-full flex flex-col items-center justify-center text-muted">
                             <Package size={48} style={{ opacity: 0.4, marginBottom: '1rem' }} />
                             <p className="text-sm">No items yet</p>
                         </div>
@@ -682,8 +683,11 @@ const POS = () => {
                     )}
                 </div>
 
-                {/* Cart Footer */}
-                <div className="cart-footer">
+                {/* Checkout inputs scroll together with the item list so the
+                    items keep the cart's vertical space instead of being
+                    squeezed by the always-visible detail fields. */}
+                {cartItems.length > 0 && (
+                <div className="cart-details-area">
                     {/* Customer Info Section */}
                     {cartItems.length > 0 && (
                         <div className="mb-4 pb-4 border-b" style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -810,7 +814,12 @@ const POS = () => {
                             </div>
                         </div>
                     )}
+                </div>
+                )}
+                </div>
 
+                {/* Cart Footer — pinned totals + actions */}
+                <div className="cart-footer">
                     <div className="mb-3">
                         <div className="summary-row">
                             <span>Subtotal</span>
