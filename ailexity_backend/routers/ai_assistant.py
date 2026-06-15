@@ -140,8 +140,8 @@ class AIQueryRequest(BaseModel):
 
 class AIQueryResponse(BaseModel):
     response: str
-    intent: str = None
-    confidence: float = None
+    intent: Optional[str] = None
+    confidence: Optional[float] = None
     timestamp: str
 
 def _build_system_prompt(current_user: dict, pos_data: Dict[str, Any]) -> str:
@@ -191,8 +191,10 @@ async def query_ai_assistant(
                     confidence=1.0,
                     timestamp=datetime.now().isoformat()
                 )
-            except openrouter_client.OpenRouterError as e:
-                logger.error(f"OpenRouter call failed, falling back to rule-based response: {e}")
+            except Exception as e:
+                # Includes OpenRouterError and any network/timeout (httpx) errors —
+                # never let an LLM hiccup take down the whole request; fall back.
+                logger.error(f"OpenRouter call failed, falling back to rule-based response: {e}", exc_info=True)
 
         # Fallback: rule-based response generator
         response_generator = POSResponseGenerator()

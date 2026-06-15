@@ -116,6 +116,12 @@
     gap: 12px;
 }
 
+.pos-header-search {
+    flex: 1 1 auto;
+    max-width: 460px;
+    margin: 0 16px;
+}
+
 .table-selector-btn {
     display: flex;
     align-items: center;
@@ -307,6 +313,12 @@
         width: 100%;
         display: flex;
         justify-content: stretch;
+    }
+
+    .pos-header-search {
+        width: 100%;
+        max-width: none;
+        margin: 0;
     }
 
     .table-selector-btn {
@@ -1251,7 +1263,10 @@
             "header cart"
             "left cart";
         flex-direction: unset;
-        gap: 1rem;
+        column-gap: 0;
+        row-gap: 1rem;
+        padding-left: 0;
+        padding-right: 0;
     }
 
     .pos-header-wrapper {

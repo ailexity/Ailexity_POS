@@ -427,6 +427,15 @@ const POS = () => {
                                 <p className="pos-subtitle">{isRetailer ? 'Retail billing mode' : 'Select items below'}</p>
                             </div>
                         </div>
+                        <div className="pos-header-search pos-search-wrapper">
+                            <Search className="pos-search-icon" size={18} />
+                            <input
+                                className="pos-search-input-field"
+                                placeholder="Search items..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
                         {!isRetailer && (
                             <div className="pos-header-actions">
                                 <button
@@ -509,15 +518,6 @@ const POS = () => {
                                 {cat}
                             </button>
                         ))}
-                    </div>
-                    <div className="pos-search-wrapper pos-category-search">
-                        <Search className="pos-search-icon" size={18} />
-                        <input
-                            className="pos-search-input-field"
-                            placeholder="Search items..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
                     </div>
                 </div>
 

@@ -415,15 +415,15 @@ const StockManagement = () => {
                         <p className="stock-analytics-value">{totalCurrentStock.toFixed(2)}</p>
                         <p className="stock-analytics-sub">Total available quantity across all items.</p>
                     </div>
-                    <div className="stock-analytics-card">
-                        <p className="stock-analytics-label">Stock purchased</p>
-                        <p className="stock-analytics-value">{analytics.purchasedQty.toFixed(2)}</p>
-                        <p className="stock-analytics-sub">Value: {formatCurrency(analytics.purchasedValue)}</p>
+                    <div className="stock-analytics-card in-card">
+                        <p className="stock-analytics-label"><ArrowDownToLine size={13} /> Total stock in</p>
+                        <p className="stock-analytics-value">+{analytics.purchasedQty.toFixed(2)}</p>
+                        <p className="stock-analytics-sub">Added to inventory · {formatCurrency(analytics.purchasedValue)}</p>
                     </div>
-                    <div className="stock-analytics-card">
-                        <p className="stock-analytics-label">Stock used</p>
-                        <p className="stock-analytics-value">{analytics.usedQty.toFixed(2)}</p>
-                        <p className="stock-analytics-sub">Value: {formatCurrency(analytics.usedValue)}</p>
+                    <div className="stock-analytics-card out-card">
+                        <p className="stock-analytics-label"><ArrowUpFromLine size={13} /> Total stock out</p>
+                        <p className="stock-analytics-value">−{analytics.usedQty.toFixed(2)}</p>
+                        <p className="stock-analytics-sub">Used / removed · {formatCurrency(analytics.usedValue)}</p>
                     </div>
                 </div>
 
@@ -516,7 +516,10 @@ const StockManagement = () => {
                                             <td data-label="Details">
                                                 <div className="stock-details-cell">
                                                     <span className="stock-detail-count">Vendors: {item.details?.length || 0}</span>
-                                                    <span className="stock-item-sub">In: {entryTxns.length} · Out: {exitTxns.length}</span>
+                                                    <span className="stock-item-sub stock-inout-line">
+                                                        <span className="in">▾ {entryTxns.length} in</span>
+                                                        <span className="out">▴ {exitTxns.length} out</span>
+                                                    </span>
                                                     <button
                                                         className="stock-link-btn"
                                                         onClick={() => setExpandedHistoryId((prev) => (prev === item.id ? null : item.id))}
@@ -559,16 +562,19 @@ const StockManagement = () => {
                                                         ) : (
                                                             <div className="stock-history-sections">
                                                                 <div className="stock-history-block">
-                                                                    <div className="stock-history-block-head">Stock In</div>
+                                                                    <div className="stock-history-block-head in">
+                                                                        <ArrowDownToLine size={14} /> Stock In · added {entryTxns.length}
+                                                                    </div>
                                                                     {entryTxns.length === 0 ? (
-                                                                        <p className="stock-history-empty">No stock in records.</p>
+                                                                        <p className="stock-history-empty">No stock added yet.</p>
                                                                     ) : (
                                                                         <div className="stock-history-list">
                                                                             {entryTxns.slice(0, 8).map((txn) => (
-                                                                                <div className="stock-history-item" key={txn.id}>
+                                                                                <div className="stock-history-item entry" key={txn.id}>
                                                                                     <div className="stock-history-main">
-                                                                                        <span className="stock-history-qty">{txn.quantity} {item.unit}</span>
-                                                                                        <span className="stock-history-qty">{formatCurrency(txn.totalPrice)}</span>
+                                                                                        <span className="stock-move-badge in"><ArrowDownToLine size={12} /> Added</span>
+                                                                                        <span className="stock-move-qty in">+{txn.quantity} {item.unit}</span>
+                                                                                        <span className="stock-history-price">{formatCurrency(txn.totalPrice)}</span>
                                                                                         <span className="stock-history-date">{formatDateTime(txn.created_at || txn.createdAt)}</span>
                                                                                     </div>
                                                                                     <div className="stock-history-meta single-col">
@@ -583,16 +589,19 @@ const StockManagement = () => {
                                                                 </div>
 
                                                                 <div className="stock-history-block">
-                                                                    <div className="stock-history-block-head">Stock Out</div>
+                                                                    <div className="stock-history-block-head out">
+                                                                        <ArrowUpFromLine size={14} /> Stock Out · used {exitTxns.length}
+                                                                    </div>
                                                                     {exitTxns.length === 0 ? (
-                                                                        <p className="stock-history-empty">No stock out records.</p>
+                                                                        <p className="stock-history-empty">No stock used yet.</p>
                                                                     ) : (
                                                                         <div className="stock-history-list">
                                                                             {exitTxns.slice(0, 8).map((txn) => (
-                                                                                <div className="stock-history-item" key={txn.id}>
+                                                                                <div className="stock-history-item exit" key={txn.id}>
                                                                                     <div className="stock-history-main">
-                                                                                        <span className="stock-history-qty">{txn.quantity} {item.unit}</span>
-                                                                                        <span className="stock-history-qty">{formatCurrency(txn.totalPrice)}</span>
+                                                                                        <span className="stock-move-badge out"><ArrowUpFromLine size={12} /> Used</span>
+                                                                                        <span className="stock-move-qty out">−{txn.quantity} {item.unit}</span>
+                                                                                        <span className="stock-history-price">{formatCurrency(txn.totalPrice)}</span>
                                                                                         <span className="stock-history-date">{formatDateTime(txn.created_at || txn.createdAt)}</span>
                                                                                     </div>
                                                                                     <div className="stock-history-meta single-col">
@@ -775,6 +784,29 @@ const StockManagement = () => {
                         </div>
 
                         <form className="stock-form" onSubmit={handleSaveTxn}>
+                            <div className={`stock-txn-banner ${txnType}`}>
+                                {txnType === 'entry' ? <ArrowDownToLine size={16} /> : <ArrowUpFromLine size={16} />}
+                                <span>
+                                    {txnType === 'entry'
+                                        ? 'Stock In — you are adding stock to inventory.'
+                                        : 'Stock Out — you are removing stock from inventory.'}
+                                </span>
+                            </div>
+                            <div className="stock-form-group">
+                                <label>Stock Item</label>
+                                <select
+                                    value={txnItemId || ''}
+                                    onChange={(event) => setTxnItemId(event.target.value)}
+                                    required
+                                >
+                                    <option value="" disabled>Select a stock item</option>
+                                    {items.map((item) => (
+                                        <option key={item.id} value={item.id}>
+                                            {item.name} ({item.currentStock} {item.unit} in stock)
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                             <div className="stock-form-group">
                                 <label>Quantity ({txnItem.unit})</label>
                                 <input
@@ -837,16 +869,41 @@ const StockManagement = () => {
                                 />
                             </div>
 
-                            <div className="stock-txn-preview">
-                                Current: <strong>{txnItem.currentStock}</strong> {txnItem.unit}
-                                {' · '}After: <strong>{projectedStock.toFixed(2)}</strong> {txnItem.unit}
-                                {' · '}Value: <strong>{formatCurrency((Number(txnForm.quantity || 0) * Number(txnForm.unitPrice || 0)) || 0)}</strong>
+                            <div className={`stock-txn-preview ${txnType}`}>
+                                <p className="stock-txn-explain">
+                                    {Number(txnForm.quantity) > 0
+                                        ? (txnType === 'entry'
+                                            ? `Adding ${txnForm.quantity} ${txnItem.unit} of ${txnItem.name} to your stock.`
+                                            : `Removing ${txnForm.quantity} ${txnItem.unit} of ${txnItem.name} from your stock.`)
+                                        : (txnType === 'entry'
+                                            ? 'Enter a quantity above to add stock.'
+                                            : 'Enter a quantity above to remove stock.')}
+                                </p>
+                                <div className="stock-txn-flow">
+                                    <div className="stock-txn-step">
+                                        <span className="stock-txn-step-label">Stock now</span>
+                                        <span className="stock-txn-step-value">{Number(txnItem.currentStock).toFixed(2)} {txnItem.unit}</span>
+                                    </div>
+                                    <span className={`stock-txn-arrow ${txnType}`}>
+                                        {txnType === 'entry' ? '+' : '−'}{Number(txnForm.quantity || 0)} →
+                                    </span>
+                                    <div className="stock-txn-step result">
+                                        <span className="stock-txn-step-label">After this</span>
+                                        <span className="stock-txn-step-value">{projectedStock.toFixed(2)} {txnItem.unit}</span>
+                                    </div>
+                                </div>
+                                <div className="stock-txn-value-line">
+                                    Transaction value: <strong>{formatCurrency((Number(txnForm.quantity || 0) * Number(txnForm.unitPrice || 0)) || 0)}</strong>
+                                </div>
+                                {txnType === 'exit' && projectedStock < 0 && (
+                                    <p className="stock-txn-warning">⚠ This is more than you currently have in stock.</p>
+                                )}
                             </div>
 
                             <div className="stock-modal-footer">
                                 <button type="button" className="stock-modal-btn cancel" onClick={closeTxnModal}>Cancel</button>
                                 <button type="submit" className={`stock-modal-btn submit ${txnType === 'exit' ? 'danger' : ''}`}>
-                                    {txnType === 'entry' ? 'Save Stock In' : 'Save Stock Out'}
+                                    {txnType === 'entry' ? '＋ Add to Stock' : '－ Remove from Stock'}
                                 </button>
                             </div>
                         </form>

@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 
+// Statuses that represent live kitchen work still on the table.
+// Terminal statuses (completed/cancelled) are intentionally excluded.
+const ACTIVE_KOT_STATUSES = new Set(['pending', 'printed', 'preparing', 'ready']);
+
+// Used only as a deterministic tie-breaker when two active KOTs share the
+// same updated time — the more progressed status wins.
 const KOT_STATUS_RANK = {
-    cancelled: 0, completed: 0,
     pending: 1, printed: 2, preparing: 3, ready: 4,
 };
 
@@ -33,11 +38,20 @@ export function useKOTStatus(isRetailer = false, intervalMs = 10000) {
             kotsData.forEach((kot) => {
                 const key = kot.table_number != null ? String(kot.table_number) : null;
                 if (!key) return;
-                const rank = KOT_STATUS_RANK[kot.status] ?? 1;
-                const existing = map[key];
-                const existingRank = existing ? (KOT_STATUS_RANK[existing.status] ?? 1) : -1;
+                // Only surface live kitchen work; ignore completed/cancelled so
+                // cleared tables don't keep showing a stale order status.
+                if (!ACTIVE_KOT_STATUSES.has(kot.status)) return;
+
                 const updatedAt = new Date(kot.updated_at || kot.created_at || 0);
-                if (!existing || rank > existingRank || updatedAt > existing.updatedAt) {
+                const existing = map[key];
+                // Show the table's most recently updated active order. Tie-break
+                // on status progression so the result is deterministic.
+                const isNewer = !existing
+                    || updatedAt > existing.updatedAt
+                    || (updatedAt.getTime() === existing.updatedAt.getTime()
+                        && (KOT_STATUS_RANK[kot.status] ?? 1) > (KOT_STATUS_RANK[existing.status] ?? 1));
+
+                if (isNewer) {
                     map[key] = {
                         status: kot.status,
                         label: KOT_STATUS_LABELS[kot.status] || kot.status,

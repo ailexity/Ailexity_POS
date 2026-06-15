@@ -55,8 +55,12 @@ async def chat_completion(system_prompt: str, history: list, user_message: str) 
         "max_tokens": 600,
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(OPENROUTER_URL, headers=headers, json=payload)
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(OPENROUTER_URL, headers=headers, json=payload)
+    except httpx.HTTPError as e:
+        logger.error(f"OpenRouter network error: {e}")
+        raise OpenRouterError(f"OpenRouter request failed: {e}")
 
     if response.status_code != 200:
         logger.error(f"OpenRouter error {response.status_code}: {response.text}")

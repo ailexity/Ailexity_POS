@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pymongo.database import Database
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from pydantic import BaseModel
 import sys
 import os
@@ -133,8 +133,8 @@ class AIQueryRequest(BaseModel):
 
 class AIQueryResponse(BaseModel):
     response: str
-    intent: str = None
-    confidence: float = None
+    intent: Optional[str] = None
+    confidence: Optional[float] = None
     timestamp: str
 
 @router.post("/ai/query", response_model=AIQueryResponse)
